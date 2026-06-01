@@ -252,7 +252,7 @@ function Index() {
         </section>
 
         {/* Upload */}
-        {!draft && (
+        {draftList.length === 0 && (
           <section>
             <label
               onDragOver={(e) => {

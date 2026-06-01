@@ -79,7 +79,7 @@ function Index() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
-  const [draft, setDraft] = useState<Draft | null>(null);
+  const [draftList, setDraftList] = useState<Draft[]>([]);
   const [preview, setPreview] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);

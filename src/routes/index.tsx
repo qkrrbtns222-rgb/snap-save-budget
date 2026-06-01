@@ -131,16 +131,24 @@ function Index() {
         setAnalyzing(true);
         try {
           const result = await analyze({ data: { imageDataUrl: dataUrl } });
-          setDraft({
-            spent_at: toLocalInput(result.spent_at),
-            merchant: result.merchant,
-            amount: String(result.amount),
-            category: (CATEGORIES as readonly string[]).includes(result.category)
-              ? (result.category as Category)
+          const items = result.expenses ?? [];
+          if (items.length === 0) {
+            toast.error("결제 내역을 찾지 못했어요. 다른 사진을 올려보세요.");
+            setPreview(null);
+            return;
+          }
+          const newDrafts: Draft[] = items.map((it) => ({
+            id: makeDraftId(),
+            spent_at: toLocalInput(it.spent_at),
+            merchant: it.merchant,
+            amount: String(it.amount),
+            category: (CATEGORIES as readonly string[]).includes(it.category)
+              ? (it.category as Category)
               : "기타",
             memo: "",
-          });
-          toast.success("분석 완료! 내용을 확인하고 저장해주세요");
+          }));
+          setDraftList((prev) => [...prev, ...newDrafts]);
+          toast.success(`${newDrafts.length}건 분석 완료! 내용을 확인하고 저장해주세요`);
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : "분석에 실패했습니다";
           toast.error(msg);
@@ -164,34 +172,46 @@ function Index() {
     [handleFile],
   );
 
-  const resetDraft = () => {
-    setDraft(null);
+  const updateDraft = (id: string, patch: Partial<Draft>) =>
+    setDraftList((prev) => prev.map((d) => (d.id === id ? { ...d, ...patch } : d)));
+
+  const removeDraft = (id: string) =>
+    setDraftList((prev) => prev.filter((d) => d.id !== id));
+
+  const resetAll = () => {
+    setDraftList([]);
     setPreview(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const saveDraft = async () => {
-    if (!draft) return;
-    const amountNum = Number(draft.amount.replace(/[^\d.]/g, ""));
-    if (!draft.merchant.trim() || !amountNum || !draft.spent_at) {
+  const draftToInsert = (d: Draft) => {
+    const amountNum = Number(d.amount.replace(/[^\d.]/g, ""));
+    if (!d.merchant.trim() || !amountNum || !d.spent_at) return null;
+    return {
+      spent_at: new Date(d.spent_at).toISOString(),
+      merchant: d.merchant.trim(),
+      amount: amountNum,
+      category: d.category,
+      memo: d.memo.trim() || null,
+    };
+  };
+
+  const saveAll = async () => {
+    if (draftList.length === 0) return;
+    const rows = draftList.map(draftToInsert);
+    if (rows.some((r) => r === null)) {
       toast.error("사용처, 금액, 날짜를 모두 입력해주세요");
       return;
     }
     setLoading(true);
-    const { error } = await supabase.from("expenses").insert({
-      spent_at: new Date(draft.spent_at).toISOString(),
-      merchant: draft.merchant.trim(),
-      amount: amountNum,
-      category: draft.category,
-      memo: draft.memo.trim() || null,
-    });
+    const { error } = await supabase.from("expenses").insert(rows as NonNullable<ReturnType<typeof draftToInsert>>[]);
     setLoading(false);
     if (error) {
       toast.error("저장 실패: " + error.message);
       return;
     }
-    toast.success("가계부에 저장되었습니다");
-    resetDraft();
+    toast.success(`${rows.length}건 저장되었습니다`);
+    resetAll();
     loadExpenses();
   };
 

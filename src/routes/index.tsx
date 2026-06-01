@@ -300,93 +300,134 @@ function Index() {
           </section>
         )}
 
-        {/* Draft form */}
-        {draft && (
-          <section className="rounded-2xl bg-card border p-5 shadow-sm space-y-4">
-            <div className="flex items-center justify-between">
+        {/* Drafts */}
+        {draftList.length > 0 && (
+          <section className="space-y-4">
+            <div className="flex items-center justify-between px-1">
               <div className="flex items-center gap-2">
                 <Sparkles className="size-4 text-primary" />
-                <h2 className="font-semibold">AI 추출 결과 확인</h2>
+                <h2 className="font-semibold">
+                  AI 추출 결과 <span className="text-muted-foreground font-normal">({draftList.length}건)</span>
+                </h2>
               </div>
               <button
-                onClick={resetDraft}
+                onClick={resetAll}
                 className="text-muted-foreground hover:text-foreground p-1"
-                aria-label="취소"
+                aria-label="전체 취소"
               >
                 <X className="size-4" />
               </button>
             </div>
 
             {preview && (
-              <div className="rounded-xl overflow-hidden border bg-muted max-h-48 flex items-center justify-center">
-                <img src={preview} alt="업로드한 스크린샷" className="max-h-48 object-contain" />
+              <div className="rounded-xl overflow-hidden border bg-muted max-h-40 flex items-center justify-center">
+                <img src={preview} alt="업로드한 스크린샷" className="max-h-40 object-contain" />
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="col-span-2">
-                <Label htmlFor="merchant" className="text-xs">사용처</Label>
-                <Input
-                  id="merchant"
-                  value={draft.merchant}
-                  onChange={(e) => setDraft({ ...draft, merchant: e.target.value })}
-                  className="mt-1"
-                />
+            {draftList.map((d, idx) => (
+              <div key={d.id} className="rounded-2xl bg-card border p-5 shadow-sm space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">#{idx + 1}</span>
+                  <button
+                    onClick={() => removeDraft(d.id)}
+                    className="text-muted-foreground hover:text-destructive p-1"
+                    aria-label="이 항목 제거"
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="col-span-2">
+                    <Label htmlFor={`merchant-${d.id}`} className="text-xs">사용처</Label>
+                    <Input
+                      id={`merchant-${d.id}`}
+                      value={d.merchant}
+                      onChange={(e) => updateDraft(d.id, { merchant: e.target.value })}
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor={`amount-${d.id}`} className="text-xs">금액 (원)</Label>
+                    <Input
+                      id={`amount-${d.id}`}
+                      inputMode="numeric"
+                      value={d.amount}
+                      onChange={(e) => updateDraft(d.id, { amount: e.target.value })}
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor={`category-${d.id}`} className="text-xs">카테고리</Label>
+                    <Select
+                      value={d.category}
+                      onValueChange={(v) => updateDraft(d.id, { category: v as Category })}
+                    >
+                      <SelectTrigger id={`category-${d.id}`} className="mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CATEGORIES.map((c) => (
+                          <SelectItem key={c} value={c}>{c}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="col-span-2">
+                    <Label htmlFor={`spent_at-${d.id}`} className="text-xs">결제일시</Label>
+                    <Input
+                      id={`spent_at-${d.id}`}
+                      type="datetime-local"
+                      value={d.spent_at}
+                      onChange={(e) => updateDraft(d.id, { spent_at: e.target.value })}
+                      className="mt-1"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <Label htmlFor={`memo-${d.id}`} className="text-xs">메모 (선택)</Label>
+                    <Input
+                      id={`memo-${d.id}`}
+                      value={d.memo}
+                      onChange={(e) => updateDraft(d.id, { memo: e.target.value })}
+                      className="mt-1"
+                      placeholder="예: 친구와 점심"
+                    />
+                  </div>
+                </div>
               </div>
-              <div>
-                <Label htmlFor="amount" className="text-xs">금액 (원)</Label>
-                <Input
-                  id="amount"
-                  inputMode="numeric"
-                  value={draft.amount}
-                  onChange={(e) => setDraft({ ...draft, amount: e.target.value })}
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <Label htmlFor="category" className="text-xs">카테고리</Label>
-                <Select
-                  value={draft.category}
-                  onValueChange={(v) => setDraft({ ...draft, category: v as Category })}
-                >
-                  <SelectTrigger id="category" className="mt-1">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CATEGORIES.map((c) => (
-                      <SelectItem key={c} value={c}>{c}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="col-span-2">
-                <Label htmlFor="spent_at" className="text-xs">결제일시</Label>
-                <Input
-                  id="spent_at"
-                  type="datetime-local"
-                  value={draft.spent_at}
-                  onChange={(e) => setDraft({ ...draft, spent_at: e.target.value })}
-                  className="mt-1"
-                />
-              </div>
-              <div className="col-span-2">
-                <Label htmlFor="memo" className="text-xs">메모 (선택)</Label>
-                <Input
-                  id="memo"
-                  value={draft.memo}
-                  onChange={(e) => setDraft({ ...draft, memo: e.target.value })}
-                  className="mt-1"
-                  placeholder="예: 친구와 점심"
-                />
-              </div>
-            </div>
+            ))}
 
-            <div className="flex gap-2 pt-1">
-              <Button variant="outline" onClick={resetDraft} className="flex-1">
-                취소
+            <label className="block rounded-xl border-2 border-dashed border-border bg-card text-center py-3 cursor-pointer hover:border-primary/50 transition text-sm text-muted-foreground">
+              <input
+                type="file"
+                accept="image/*"
+                className="sr-only"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleFile(f);
+                  e.target.value = "";
+                }}
+                disabled={analyzing}
+              />
+              <span className="inline-flex items-center gap-1.5">
+                {analyzing ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" /> 분석 중...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="size-4" /> 스크린샷 더 추가
+                  </>
+                )}
+              </span>
+            </label>
+
+            <div className="flex gap-2 sticky bottom-3">
+              <Button variant="outline" onClick={resetAll} className="flex-1">
+                전체 취소
               </Button>
-              <Button onClick={saveDraft} disabled={loading} className="flex-1">
-                {loading ? <Loader2 className="size-4 animate-spin" /> : "저장"}
+              <Button onClick={saveAll} disabled={loading} className="flex-1">
+                {loading ? <Loader2 className="size-4 animate-spin" /> : `${draftList.length}건 저장`}
               </Button>
             </div>
           </section>

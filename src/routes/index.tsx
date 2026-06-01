@@ -52,12 +52,18 @@ type Expense = {
 };
 
 type Draft = {
+  id: string;
   spent_at: string;
   merchant: string;
   amount: string;
   category: Category;
   memo: string;
 };
+
+const makeDraftId = () =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `d_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
 function toLocalInput(iso: string) {
   const d = new Date(iso);

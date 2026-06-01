@@ -14,11 +14,18 @@ export const analyzeReceipt = createServerFn({ method: "POST" })
     if (!apiKey) throw new Error("LOVABLE_API_KEY가 설정되어 있지 않습니다.");
 
     const systemPrompt = `당신은 한국 결제 영수증/문자/은행앱 스크린샷을 분석하는 전문가입니다.
-이미지에서 다음 정보를 정확히 추출하세요:
+이미지에 **여러 건의 결제 내역**이 포함될 수 있습니다 (예: 거래내역 목록, 여러 영수증을 한 장에 모은 사진 등).
+각 결제 건마다 다음 정보를 추출해 배열로 반환하세요:
 - 결제일시 (날짜와 시간, ISO 8601 형식)
 - 가맹점/사용처 (브랜드명만 간결하게)
-- 결제 금액 (쉼표, '원' 제거한 순수 정수)
+- 결제 금액 (쉼표, '원' 제거한 순수 정수, 양수)
 - 카테고리 (다음 중 하나: ${CATEGORIES.join(", ")})
+
+규칙:
+- 입금/환불/취소 항목은 제외하고, 출금/결제(지출) 건만 포함하세요.
+- 동일 건이 중복으로 보여도 한 번만 추출하세요.
+- 결제 건이 1건만 있으면 배열에 1개만 담아 반환하세요.
+- 추출 가능한 결제 건이 전혀 없으면 빈 배열을 반환하세요.
 
 카테고리 판단 기준:
 - 식비: 식당, 배달, 편의점 음식, 마트 식료품
@@ -44,7 +51,7 @@ export const analyzeReceipt = createServerFn({ method: "POST" })
           {
             role: "user",
             content: [
-              { type: "text", text: "이 결제 스크린샷에서 정보를 추출해주세요." },
+              { type: "text", text: "이 스크린샷에서 모든 결제(지출) 내역을 빠짐없이 추출해주세요." },
               { type: "image_url", image_url: { url: data.imageDataUrl } },
             ],
           },
@@ -53,27 +60,38 @@ export const analyzeReceipt = createServerFn({ method: "POST" })
           {
             type: "function",
             function: {
-              name: "extract_expense",
-              description: "결제 정보 추출",
+              name: "extract_expenses",
+              description: "스크린샷에서 추출한 모든 결제 내역 목록",
               parameters: {
                 type: "object",
                 properties: {
-                  spent_at: {
-                    type: "string",
-                    description: "결제일시. ISO 8601 (예: 2025-06-01T14:30:00). 시간 미상이면 00:00:00, 날짜 미상이면 오늘 날짜.",
+                  expenses: {
+                    type: "array",
+                    description: "추출된 결제 건 목록 (0개 이상)",
+                    items: {
+                      type: "object",
+                      properties: {
+                        spent_at: {
+                          type: "string",
+                          description:
+                            "결제일시. ISO 8601 (예: 2025-06-01T14:30:00). 시간 미상이면 00:00:00, 날짜 미상이면 오늘 날짜.",
+                        },
+                        merchant: { type: "string", description: "가맹점명/사용처" },
+                        amount: { type: "integer", description: "금액 (양의 정수, 원화)" },
+                        category: { type: "string", enum: [...CATEGORIES] },
+                      },
+                      required: ["spent_at", "merchant", "amount", "category"],
+                      additionalProperties: false,
+                    },
                   },
-                  merchant: { type: "string", description: "가맹점명/사용처" },
-                  amount: { type: "integer", description: "금액 (정수, 원화)" },
-                  category: { type: "string", enum: [...CATEGORIES] },
-                  confidence: { type: "number", description: "추출 신뢰도 0~1" },
                 },
-                required: ["spent_at", "merchant", "amount", "category"],
+                required: ["expenses"],
                 additionalProperties: false,
               },
             },
           },
         ],
-        tool_choice: { type: "function", function: { name: "extract_expense" } },
+        tool_choice: { type: "function", function: { name: "extract_expenses" } },
       }),
     });
 
@@ -95,11 +113,20 @@ export const analyzeReceipt = createServerFn({ method: "POST" })
       throw new Error("AI 응답에서 정보를 추출하지 못했습니다.");
     }
     const args = JSON.parse(toolCall.function.arguments);
-    return {
-      spent_at: String(args.spent_at),
-      merchant: String(args.merchant),
-      amount: Number(args.amount),
-      category: String(args.category),
-      confidence: typeof args.confidence === "number" ? args.confidence : null,
-    };
+    const rawList: unknown[] = Array.isArray(args.expenses) ? args.expenses : [];
+    const expenses = rawList
+      .map((it) => {
+        const o = it as Record<string, unknown>;
+        const amount = Number(o.amount);
+        if (!o.merchant || !o.spent_at || !amount || amount <= 0) return null;
+        return {
+          spent_at: String(o.spent_at),
+          merchant: String(o.merchant),
+          amount,
+          category: String(o.category ?? "기타"),
+        };
+      })
+      .filter((x): x is { spent_at: string; merchant: string; amount: number; category: string } => x !== null);
+
+    return { expenses };
   });

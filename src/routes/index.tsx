@@ -138,10 +138,25 @@ function Index() {
       .reduce((sum, e) => sum + Number(e.amount), 0);
   }, [expenses]);
 
+  const monthByAsset = useMemo(() => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth();
+    const map = new Map<string, number>();
+    for (const e of expenses) {
+      const d = new Date(e.spent_at);
+      if (d.getFullYear() !== y || d.getMonth() !== m) continue;
+      const key = e.asset || "기타";
+      map.set(key, (map.get(key) ?? 0) + Number(e.amount));
+    }
+    return Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
+  }, [expenses]);
+
   const monthLabel = useMemo(() => {
     const now = new Date();
     return `${now.getFullYear()}년 ${now.getMonth() + 1}월`;
   }, []);
+
 
   const handleFile = useCallback(
     async (file: File) => {

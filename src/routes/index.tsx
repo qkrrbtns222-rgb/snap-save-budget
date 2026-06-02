@@ -174,8 +174,10 @@ function Index() {
             category: (CATEGORIES as readonly string[]).includes(it.category)
               ? (it.category as Category)
               : "기타",
+            asset: (it.asset ?? "").trim() || "기타",
             memo: "",
           }));
+
           setDraftList((prev) => [...prev, ...newDrafts]);
           toast.success(`${newDrafts.length}건 분석 완료! 내용을 확인하고 저장해주세요`);
         } catch (err: unknown) {

@@ -1,0 +1,1 @@
+ALTER TABLE public.expenses ADD COLUMN asset text NOT NULL DEFAULT '기타';

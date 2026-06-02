@@ -300,6 +300,26 @@ function Index() {
           </div>
         </section>
 
+        {/* Monthly per-asset summary */}
+        {monthByAsset.length > 0 && (
+          <section className="rounded-2xl border bg-card p-4 shadow-sm">
+            <div className="flex items-baseline justify-between mb-2 px-1">
+              <h2 className="text-sm font-semibold">{monthLabel} 결제 수단별</h2>
+              <span className="text-[11px] text-muted-foreground">{monthByAsset.length}개</span>
+            </div>
+            <ul className="divide-y">
+              {monthByAsset.map(([asset, sum]) => (
+                <li key={asset} className="flex items-center justify-between py-2 px-1">
+                  <span className="text-sm">{asset}</span>
+                  <span className="text-sm font-semibold tabular-nums">{won(sum)}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+
+
         {/* Upload */}
         {draftList.length === 0 && (
           <section>

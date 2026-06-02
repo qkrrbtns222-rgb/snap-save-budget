@@ -249,11 +249,12 @@ function Index() {
       <main className="mx-auto max-w-2xl px-5 pt-6 space-y-6">
         {/* Dashboard */}
         <section className="rounded-2xl bg-gradient-to-br from-primary to-[oklch(0.55_0.2_265)] text-primary-foreground p-6 shadow-sm">
-          <p className="text-sm/none opacity-80">{monthLabel} 총지출</p>
-          <p className="mt-2 text-3xl font-bold tracking-tight">{won(monthTotal)}</p>
-          <p className="mt-1 text-xs opacity-75">
-            전체 {expenses.length}건 저장됨
-          </p>
+          <p className="text-sm/none opacity-80">전체 총지출</p>
+          <p className="mt-2 text-3xl font-bold tracking-tight">{won(totalAll)}</p>
+          <div className="mt-3 flex items-center justify-between text-xs opacity-80">
+            <span>{monthLabel}: {won(monthTotal)}</span>
+            <span>{expenses.length}건</span>
+          </div>
         </section>
 
         {/* Upload */}

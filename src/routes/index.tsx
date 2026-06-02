@@ -97,6 +97,11 @@ function Index() {
     loadExpenses();
   }, [loadExpenses]);
 
+  const totalAll = useMemo(
+    () => expenses.reduce((sum, e) => sum + Number(e.amount), 0),
+    [expenses],
+  );
+
   const monthTotal = useMemo(() => {
     const now = new Date();
     const y = now.getFullYear();

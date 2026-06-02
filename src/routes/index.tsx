@@ -443,6 +443,33 @@ function Index() {
                     </Select>
                   </div>
                   <div className="col-span-2">
+                    <Label htmlFor={`asset-${d.id}`} className="text-xs">결제 수단</Label>
+                    <Select
+                      value={ASSETS.includes(d.asset as Asset) ? d.asset : "__custom__"}
+                      onValueChange={(v) =>
+                        updateDraft(d.id, { asset: v === "__custom__" ? "" : v })
+                      }
+                    >
+                      <SelectTrigger id={`asset-${d.id}`} className="mt-1">
+                        <SelectValue placeholder="결제 수단 선택" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ASSETS.map((a) => (
+                          <SelectItem key={a} value={a}>{a}</SelectItem>
+                        ))}
+                        <SelectItem value="__custom__">직접 입력</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {!ASSETS.includes(d.asset as Asset) && (
+                      <Input
+                        value={d.asset}
+                        onChange={(e) => updateDraft(d.id, { asset: e.target.value })}
+                        placeholder="예: 신한카드"
+                        className="mt-2"
+                      />
+                    )}
+
+                  <div className="col-span-2">
                     <Label htmlFor={`spent_at-${d.id}`} className="text-xs">결제일시</Label>
                     <Input
                       id={`spent_at-${d.id}`}

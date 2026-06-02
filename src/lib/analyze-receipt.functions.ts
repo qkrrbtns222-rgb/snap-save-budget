@@ -131,9 +131,11 @@ export const analyzeReceipt = createServerFn({ method: "POST" })
           merchant: String(o.merchant),
           amount,
           category: String(o.category ?? "기타"),
+          asset: String(o.asset ?? "기타").trim() || "기타",
         };
       })
-      .filter((x): x is { spent_at: string; merchant: string; amount: number; category: string } => x !== null);
+      .filter((x): x is { spent_at: string; merchant: string; amount: number; category: string; asset: string } => x !== null);
 
     return { expenses };
   });
+

@@ -42,12 +42,34 @@ const CATEGORY_COLORS: Record<string, string> = {
   기타: "bg-zinc-100 text-zinc-700",
 };
 
+const ASSETS = [
+  "신한은행",
+  "국민은행",
+  "우리은행",
+  "하나은행",
+  "카카오뱅크",
+  "토스뱅크",
+  "신한카드",
+  "국민카드",
+  "삼성카드",
+  "현대카드",
+  "롯데카드",
+  "BC카드",
+  "카카오페이",
+  "네이버페이",
+  "토스",
+  "현금",
+  "기타",
+] as const;
+type Asset = (typeof ASSETS)[number];
+
 type Expense = {
   id: string;
   spent_at: string;
   merchant: string;
   amount: number;
   category: string;
+  asset: string;
   memo: string | null;
 };
 
@@ -57,8 +79,10 @@ type Draft = {
   merchant: string;
   amount: string;
   category: Category;
+  asset: string;
   memo: string;
 };
+
 
 const makeDraftId = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto

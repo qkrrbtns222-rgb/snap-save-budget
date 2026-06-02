@@ -223,8 +223,10 @@ function Index() {
       merchant: d.merchant.trim(),
       amount: amountNum,
       category: d.category,
+      asset: d.asset.trim() || "기타",
       memo: d.memo.trim() || null,
     };
+
   };
 
   const saveAll = async () => {

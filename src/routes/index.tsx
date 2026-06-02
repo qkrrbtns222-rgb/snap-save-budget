@@ -468,6 +468,8 @@ function Index() {
                         className="mt-2"
                       />
                     )}
+                  </div>
+
 
                   <div className="col-span-2">
                     <Label htmlFor={`spent_at-${d.id}`} className="text-xs">결제일시</Label>

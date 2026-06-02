@@ -561,7 +561,13 @@ function Index() {
                     </div>
                     <div className="text-right">
                       <p className="font-semibold tabular-nums">{won(Number(e.amount))}</p>
+                      {e.asset && (
+                        <span className="mt-1 inline-block text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                          {e.asset}
+                        </span>
+                      )}
                     </div>
+
                     <button
                       onClick={() => deleteExpense(e.id)}
                       className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition p-1"

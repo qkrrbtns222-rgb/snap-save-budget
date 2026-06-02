@@ -42,12 +42,34 @@ const CATEGORY_COLORS: Record<string, string> = {
   기타: "bg-zinc-100 text-zinc-700",
 };
 
+const ASSETS = [
+  "신한은행",
+  "국민은행",
+  "우리은행",
+  "하나은행",
+  "카카오뱅크",
+  "토스뱅크",
+  "신한카드",
+  "국민카드",
+  "삼성카드",
+  "현대카드",
+  "롯데카드",
+  "BC카드",
+  "카카오페이",
+  "네이버페이",
+  "토스",
+  "현금",
+  "기타",
+] as const;
+type Asset = (typeof ASSETS)[number];
+
 type Expense = {
   id: string;
   spent_at: string;
   merchant: string;
   amount: number;
   category: string;
+  asset: string;
   memo: string | null;
 };
 
@@ -57,8 +79,10 @@ type Draft = {
   merchant: string;
   amount: string;
   category: Category;
+  asset: string;
   memo: string;
 };
+
 
 const makeDraftId = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -114,10 +138,25 @@ function Index() {
       .reduce((sum, e) => sum + Number(e.amount), 0);
   }, [expenses]);
 
+  const monthByAsset = useMemo(() => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth();
+    const map = new Map<string, number>();
+    for (const e of expenses) {
+      const d = new Date(e.spent_at);
+      if (d.getFullYear() !== y || d.getMonth() !== m) continue;
+      const key = e.asset || "기타";
+      map.set(key, (map.get(key) ?? 0) + Number(e.amount));
+    }
+    return Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
+  }, [expenses]);
+
   const monthLabel = useMemo(() => {
     const now = new Date();
     return `${now.getFullYear()}년 ${now.getMonth() + 1}월`;
   }, []);
+
 
   const handleFile = useCallback(
     async (file: File) => {
@@ -150,8 +189,10 @@ function Index() {
             category: (CATEGORIES as readonly string[]).includes(it.category)
               ? (it.category as Category)
               : "기타",
+            asset: (it.asset ?? "").trim() || "기타",
             memo: "",
           }));
+
           setDraftList((prev) => [...prev, ...newDrafts]);
           toast.success(`${newDrafts.length}건 분석 완료! 내용을 확인하고 저장해주세요`);
         } catch (err: unknown) {
@@ -197,8 +238,10 @@ function Index() {
       merchant: d.merchant.trim(),
       amount: amountNum,
       category: d.category,
+      asset: d.asset.trim() || "기타",
       memo: d.memo.trim() || null,
     };
+
   };
 
   const saveAll = async () => {
@@ -256,6 +299,26 @@ function Index() {
             <span>{expenses.length}건</span>
           </div>
         </section>
+
+        {/* Monthly per-asset summary */}
+        {monthByAsset.length > 0 && (
+          <section className="rounded-2xl border bg-card p-4 shadow-sm">
+            <div className="flex items-baseline justify-between mb-2 px-1">
+              <h2 className="text-sm font-semibold">{monthLabel} 결제 수단별</h2>
+              <span className="text-[11px] text-muted-foreground">{monthByAsset.length}개</span>
+            </div>
+            <ul className="divide-y">
+              {monthByAsset.map(([asset, sum]) => (
+                <li key={asset} className="flex items-center justify-between py-2 px-1">
+                  <span className="text-sm">{asset}</span>
+                  <span className="text-sm font-semibold tabular-nums">{won(sum)}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+
 
         {/* Upload */}
         {draftList.length === 0 && (
@@ -380,6 +443,35 @@ function Index() {
                     </Select>
                   </div>
                   <div className="col-span-2">
+                    <Label htmlFor={`asset-${d.id}`} className="text-xs">결제 수단</Label>
+                    <Select
+                      value={ASSETS.includes(d.asset as Asset) ? d.asset : "__custom__"}
+                      onValueChange={(v) =>
+                        updateDraft(d.id, { asset: v === "__custom__" ? "" : v })
+                      }
+                    >
+                      <SelectTrigger id={`asset-${d.id}`} className="mt-1">
+                        <SelectValue placeholder="결제 수단 선택" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ASSETS.map((a) => (
+                          <SelectItem key={a} value={a}>{a}</SelectItem>
+                        ))}
+                        <SelectItem value="__custom__">직접 입력</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {!ASSETS.includes(d.asset as Asset) && (
+                      <Input
+                        value={d.asset}
+                        onChange={(e) => updateDraft(d.id, { asset: e.target.value })}
+                        placeholder="예: 신한카드"
+                        className="mt-2"
+                      />
+                    )}
+                  </div>
+
+
+                  <div className="col-span-2">
                     <Label htmlFor={`spent_at-${d.id}`} className="text-xs">결제일시</Label>
                     <Input
                       id={`spent_at-${d.id}`}
@@ -469,7 +561,13 @@ function Index() {
                     </div>
                     <div className="text-right">
                       <p className="font-semibold tabular-nums">{won(Number(e.amount))}</p>
+                      {e.asset && (
+                        <span className="mt-1 inline-block text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                          {e.asset}
+                        </span>
+                      )}
                     </div>
+
                     <button
                       onClick={() => deleteExpense(e.id)}
                       className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition p-1"

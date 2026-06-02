@@ -20,6 +20,8 @@ export const analyzeReceipt = createServerFn({ method: "POST" })
 - 가맹점/사용처 (브랜드명만 간결하게)
 - 결제 금액 (쉼표, '원' 제거한 순수 정수, 양수)
 - 카테고리 (다음 중 하나: ${CATEGORIES.join(", ")})
+- 결제 수단 (asset): 은행명/카드사/간편결제명 등 (예: 신한은행, 국민카드, 삼성카드, 카카오페이, 네이버페이, 토스, 현금). 이미지에서 확인되지 않으면 "기타".
+
 
 규칙:
 - 입금/환불/취소 항목은 제외하고, 출금/결제(지출) 건만 포함하세요.
@@ -79,9 +81,14 @@ export const analyzeReceipt = createServerFn({ method: "POST" })
                         merchant: { type: "string", description: "가맹점명/사용처" },
                         amount: { type: "integer", description: "금액 (양의 정수, 원화)" },
                         category: { type: "string", enum: [...CATEGORIES] },
+                        asset: {
+                          type: "string",
+                          description: "결제 수단: 은행명/카드사/간편결제명 (예: 신한은행, 국민카드, 카카오페이, 현금). 불명 시 '기타'.",
+                        },
                       },
-                      required: ["spent_at", "merchant", "amount", "category"],
+                      required: ["spent_at", "merchant", "amount", "category", "asset"],
                       additionalProperties: false,
+
                     },
                   },
                 },
@@ -124,9 +131,11 @@ export const analyzeReceipt = createServerFn({ method: "POST" })
           merchant: String(o.merchant),
           amount,
           category: String(o.category ?? "기타"),
+          asset: String(o.asset ?? "기타").trim() || "기타",
         };
       })
-      .filter((x): x is { spent_at: string; merchant: string; amount: number; category: string } => x !== null);
+      .filter((x): x is { spent_at: string; merchant: string; amount: number; category: string; asset: string } => x !== null);
 
     return { expenses };
   });
+

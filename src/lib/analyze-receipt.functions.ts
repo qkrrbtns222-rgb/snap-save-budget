@@ -81,9 +81,14 @@ export const analyzeReceipt = createServerFn({ method: "POST" })
                         merchant: { type: "string", description: "가맹점명/사용처" },
                         amount: { type: "integer", description: "금액 (양의 정수, 원화)" },
                         category: { type: "string", enum: [...CATEGORIES] },
+                        asset: {
+                          type: "string",
+                          description: "결제 수단: 은행명/카드사/간편결제명 (예: 신한은행, 국민카드, 카카오페이, 현금). 불명 시 '기타'.",
+                        },
                       },
-                      required: ["spent_at", "merchant", "amount", "category"],
+                      required: ["spent_at", "merchant", "amount", "category", "asset"],
                       additionalProperties: false,
+
                     },
                   },
                 },

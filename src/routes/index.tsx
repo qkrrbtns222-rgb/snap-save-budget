@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Toaster, toast } from "sonner";
-import { Upload, Loader2, Trash2, Sparkles, Wallet, X, Plus } from "lucide-react";
+import { Upload, Loader2, Trash2, Sparkles, Wallet, X, Plus, Target, AlertTriangle } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { analyzeReceipt } from "@/lib/analyze-receipt.functions";
@@ -16,6 +16,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 export const Route = createFileRoute("/")({
   head: () => ({

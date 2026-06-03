@@ -2,7 +2,19 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Toaster, toast } from "sonner";
-import { Upload, Loader2, Trash2, Sparkles, Wallet, X, Plus, Target, AlertTriangle } from "lucide-react";
+import { Upload, Loader2, Trash2, Sparkles, Wallet, X, Plus, BarChart3, RotateCcw } from "lucide-react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+} from "recharts";
 
 import { supabase } from "@/integrations/supabase/client";
 import { analyzeReceipt } from "@/lib/analyze-receipt.functions";
@@ -17,13 +29,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -165,27 +180,6 @@ function Index() {
     return `${now.getFullYear()}년 ${now.getMonth() + 1}월`;
   }, []);
 
-  const monthKey = useMemo(() => {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  }, []);
-
-  const budgetStorageKey = `budgets:${monthKey}`;
-  const [budgets, setBudgets] = useState<Record<string, number>>({});
-  const [budgetDialogOpen, setBudgetDialogOpen] = useState(false);
-  const [budgetDraft, setBudgetDraft] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const raw = localStorage.getItem(budgetStorageKey);
-      if (raw) setBudgets(JSON.parse(raw));
-      else setBudgets({});
-    } catch {
-      setBudgets({});
-    }
-  }, [budgetStorageKey]);
-
   const monthByCategory = useMemo(() => {
     const now = new Date();
     const y = now.getFullYear();
@@ -198,42 +192,42 @@ function Index() {
       const key = (CATEGORIES as readonly string[]).includes(e.category) ? e.category : "기타";
       map.set(key, (map.get(key) ?? 0) + Number(e.amount));
     }
-    return map;
+    return Array.from(map.entries())
+      .filter(([, v]) => v > 0)
+      .map(([category, total]) => ({ category, total }))
+      .sort((a, b) => b.total - a.total);
   }, [expenses]);
 
-  const openBudgetDialog = () => {
-    const draft: Record<string, string> = {};
-    for (const c of CATEGORIES) {
-      draft[c] = budgets[c] ? String(budgets[c]) : "";
+  const dailySeries = useMemo(() => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth();
+    const days = new Date(y, m + 1, 0).getDate();
+    const arr = Array.from({ length: days }, (_, i) => ({
+      day: i + 1,
+      label: `${i + 1}`,
+      total: 0,
+    }));
+    for (const e of expenses) {
+      const d = new Date(e.spent_at);
+      if (d.getFullYear() !== y || d.getMonth() !== m) continue;
+      arr[d.getDate() - 1].total += Number(e.amount);
     }
-    setBudgetDraft(draft);
-    setBudgetDialogOpen(true);
-  };
+    return arr;
+  }, [expenses]);
 
-  const saveBudgets = () => {
-    const next: Record<string, number> = {};
-    for (const c of CATEGORIES) {
-      const n = Number((budgetDraft[c] ?? "").replace(/[^\d]/g, ""));
-      if (n > 0) next[c] = n;
-    }
-    setBudgets(next);
-    try {
-      localStorage.setItem(budgetStorageKey, JSON.stringify(next));
-    } catch {
-      // ignore
-    }
-    setBudgetDialogOpen(false);
-    toast.success("예산이 저장되었습니다");
-  };
+  const PIE_COLORS = [
+    "hsl(220 90% 56%)",
+    "hsl(25 95% 60%)",
+    "hsl(45 95% 55%)",
+    "hsl(330 80% 60%)",
+    "hsl(160 70% 45%)",
+    "hsl(280 70% 60%)",
+    "hsl(195 80% 50%)",
+    "hsl(0 75% 60%)",
+    "hsl(220 10% 55%)",
+  ];
 
-  const budgetRows = useMemo(() => {
-    return CATEGORIES.map((c) => {
-      const budget = budgets[c] ?? 0;
-      const spent = monthByCategory.get(c) ?? 0;
-      const ratio = budget > 0 ? spent / budget : 0;
-      return { category: c, budget, spent, ratio };
-    }).filter((r) => r.budget > 0 || r.spent > 0);
-  }, [budgets, monthByCategory]);
 
 
 
@@ -352,6 +346,15 @@ function Index() {
     }
   };
 
+  const resetAllExpenses = async () => {
+    const { error } = await supabase.from("expenses").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+    if (error) toast.error("초기화 실패: " + error.message);
+    else {
+      toast.success("모든 내역이 초기화되었습니다");
+      loadExpenses();
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background pb-24">
       <Toaster position="top-center" richColors />
@@ -380,105 +383,91 @@ function Index() {
           </div>
         </section>
 
-        {/* Budgets */}
+        {/* Charts */}
         <section className="rounded-2xl border bg-card p-4 shadow-sm">
-          <div className="flex items-center justify-between mb-3 px-1">
-            <div className="flex items-center gap-1.5">
-              <Target className="size-4 text-primary" />
-              <h2 className="text-sm font-semibold">{monthLabel} 카테고리 예산</h2>
-            </div>
-            <Dialog open={budgetDialogOpen} onOpenChange={setBudgetDialogOpen}>
-              <Button size="sm" variant="outline" onClick={openBudgetDialog} className="h-7 text-xs">
-                예산 설정
-              </Button>
-              <DialogContent className="max-w-md">
-                <DialogHeader>
-                  <DialogTitle>{monthLabel} 예산 설정</DialogTitle>
-                  <DialogDescription>
-                    카테고리별 목표 금액을 입력해주세요. 비워두면 예산이 해제됩니다.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
-                  {CATEGORIES.map((c) => (
-                    <div key={c} className="flex items-center gap-3">
-                      <Label className="w-20 text-sm shrink-0">{c}</Label>
-                      <Input
-                        inputMode="numeric"
-                        placeholder="0"
-                        value={budgetDraft[c] ?? ""}
-                        onChange={(e) =>
-                          setBudgetDraft((prev) => ({ ...prev, [c]: e.target.value }))
-                        }
-                      />
-                      <span className="text-xs text-muted-foreground shrink-0">원</span>
-                    </div>
-                  ))}
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setBudgetDialogOpen(false)}>
-                    취소
-                  </Button>
-                  <Button onClick={saveBudgets}>저장</Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+          <div className="flex items-center gap-1.5 mb-3 px-1">
+            <BarChart3 className="size-4 text-primary" />
+            <h2 className="text-sm font-semibold">{monthLabel} 일별 지출</h2>
           </div>
-
-          {budgetRows.length === 0 ? (
-            <p className="text-xs text-muted-foreground text-center py-4">
-              아직 설정된 예산이 없어요. '예산 설정'을 눌러 시작해보세요!
+          {monthTotal === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-6">
+              이번 달 지출 내역이 없어요
             </p>
           ) : (
-            <ul className="space-y-3">
-              {budgetRows.map(({ category, budget, spent, ratio }) => {
-                const pct = Math.min(ratio * 100, 100);
-                const over = budget > 0 && spent > budget;
-                const warn = budget > 0 && ratio >= 0.7 && !over;
-                const barColor = over
-                  ? "bg-destructive"
-                  : warn
-                    ? "bg-yellow-500"
-                    : "bg-primary";
-                const remaining = budget - spent;
-                const color = CATEGORY_COLORS[category] ?? CATEGORY_COLORS["기타"];
-                return (
-                  <li key={category} className="space-y-1.5">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className={`font-medium px-2 py-0.5 rounded-full ${color}`}>
-                        {category}
-                      </span>
-                      <span className="tabular-nums text-muted-foreground">
-                        {won(spent)}{budget > 0 && ` / ${won(budget)}`}
-                      </span>
-                    </div>
-                    {budget > 0 ? (
-                      <>
-                        <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
-                          <div
-                            className={`h-full ${barColor} transition-all`}
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-                        <p
-                          className={`text-[11px] flex items-center gap-1 ${
-                            over ? "text-destructive font-medium" : warn ? "text-yellow-700" : "text-muted-foreground"
-                          }`}
-                        >
-                          {over && <AlertTriangle className="size-3" />}
-                          {over
-                            ? `예산 ${won(spent - budget)} 초과! (${Math.round(ratio * 100)}%)`
-                            : `남은 금액: ${won(remaining)} (${Math.round(ratio * 100)}%)`}
-                        </p>
-                      </>
-                    ) : (
-                      <p className="text-[11px] text-muted-foreground">예산 미설정</p>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
+            <div className="h-44 -ml-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={dailySeries} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fontSize: 10 }}
+                    interval={Math.max(0, Math.floor(dailySeries.length / 8) - 1)}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 10 }}
+                    tickFormatter={(v: number) =>
+                      v >= 10000 ? `${Math.round(v / 1000) / 10}만` : v >= 1000 ? `${v / 1000}천` : String(v)
+                    }
+                    axisLine={false}
+                    tickLine={false}
+                    width={40}
+                  />
+                  <Tooltip
+                    formatter={(v: number) => [won(v), "지출"]}
+                    labelFormatter={(l) => `${l}일`}
+                    contentStyle={{ fontSize: 12, borderRadius: 8 }}
+                  />
+                  <Bar dataKey="total" fill="hsl(220 90% 56%)" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           )}
         </section>
+
+        {/* Category chart */}
+        <section className="rounded-2xl border bg-card p-4 shadow-sm">
+          <div className="flex items-center gap-1.5 mb-3 px-1">
+            <BarChart3 className="size-4 text-primary" />
+            <h2 className="text-sm font-semibold">{monthLabel} 카테고리별 지출</h2>
+          </div>
+          {monthByCategory.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-6">
+              이번 달 지출 내역이 없어요
+            </p>
+          ) : (
+            <div className="h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={monthByCategory}
+                    dataKey="total"
+                    nameKey="category"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={70}
+                    innerRadius={38}
+                    paddingAngle={2}
+                  >
+                    {monthByCategory.map((_, i) => (
+                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    formatter={(v: number, n: string) => [won(v), n]}
+                    contentStyle={{ fontSize: 12, borderRadius: 8 }}
+                  />
+                  <Legend
+                    verticalAlign="bottom"
+                    iconType="circle"
+                    wrapperStyle={{ fontSize: 11 }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </section>
+
 
 
         {/* Monthly per-asset summary */}
@@ -714,9 +703,36 @@ function Index() {
 
         {/* List */}
         <section>
-          <div className="flex items-baseline justify-between mb-3 px-1">
-            <h2 className="font-semibold">최근 내역</h2>
-            <span className="text-xs text-muted-foreground">{expenses.length}건</span>
+          <div className="flex items-center justify-between mb-3 px-1">
+            <h2 className="font-semibold">
+              최근 내역 <span className="text-xs text-muted-foreground font-normal">({expenses.length}건)</span>
+            </h2>
+            {expenses.length > 0 && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground hover:text-destructive">
+                    <RotateCcw className="size-3.5" /> 전체 초기화
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>모든 지출 내역을 삭제할까요?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      저장된 {expenses.length}건의 내역이 모두 삭제됩니다. 이 작업은 되돌릴 수 없어요.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>취소</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={resetAllExpenses}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      전체 삭제
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
           </div>
           {expenses.length === 0 ? (
             <div className="rounded-2xl border bg-card p-10 text-center text-sm text-muted-foreground">

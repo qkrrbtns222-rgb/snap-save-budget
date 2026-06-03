@@ -703,9 +703,36 @@ function Index() {
 
         {/* List */}
         <section>
-          <div className="flex items-baseline justify-between mb-3 px-1">
-            <h2 className="font-semibold">최근 내역</h2>
-            <span className="text-xs text-muted-foreground">{expenses.length}건</span>
+          <div className="flex items-center justify-between mb-3 px-1">
+            <h2 className="font-semibold">
+              최근 내역 <span className="text-xs text-muted-foreground font-normal">({expenses.length}건)</span>
+            </h2>
+            {expenses.length > 0 && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground hover:text-destructive">
+                    <RotateCcw className="size-3.5" /> 전체 초기화
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>모든 지출 내역을 삭제할까요?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      저장된 {expenses.length}건의 내역이 모두 삭제됩니다. 이 작업은 되돌릴 수 없어요.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>취소</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={resetAllExpenses}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      전체 삭제
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
           </div>
           {expenses.length === 0 ? (
             <div className="rounded-2xl border bg-card p-10 text-center text-sm text-muted-foreground">

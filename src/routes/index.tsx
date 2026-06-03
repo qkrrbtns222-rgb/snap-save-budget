@@ -346,6 +346,15 @@ function Index() {
     }
   };
 
+  const resetAllExpenses = async () => {
+    const { error } = await supabase.from("expenses").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+    if (error) toast.error("초기화 실패: " + error.message);
+    else {
+      toast.success("모든 내역이 초기화되었습니다");
+      loadExpenses();
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background pb-24">
       <Toaster position="top-center" richColors />

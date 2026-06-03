@@ -165,6 +165,78 @@ function Index() {
     return `${now.getFullYear()}년 ${now.getMonth() + 1}월`;
   }, []);
 
+  const monthKey = useMemo(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  }, []);
+
+  const budgetStorageKey = `budgets:${monthKey}`;
+  const [budgets, setBudgets] = useState<Record<string, number>>({});
+  const [budgetDialogOpen, setBudgetDialogOpen] = useState(false);
+  const [budgetDraft, setBudgetDraft] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = localStorage.getItem(budgetStorageKey);
+      if (raw) setBudgets(JSON.parse(raw));
+      else setBudgets({});
+    } catch {
+      setBudgets({});
+    }
+  }, [budgetStorageKey]);
+
+  const monthByCategory = useMemo(() => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth();
+    const map = new Map<string, number>();
+    for (const c of CATEGORIES) map.set(c, 0);
+    for (const e of expenses) {
+      const d = new Date(e.spent_at);
+      if (d.getFullYear() !== y || d.getMonth() !== m) continue;
+      const key = (CATEGORIES as readonly string[]).includes(e.category) ? e.category : "기타";
+      map.set(key, (map.get(key) ?? 0) + Number(e.amount));
+    }
+    return map;
+  }, [expenses]);
+
+  const openBudgetDialog = () => {
+    const draft: Record<string, string> = {};
+    for (const c of CATEGORIES) {
+      draft[c] = budgets[c] ? String(budgets[c]) : "";
+    }
+    setBudgetDraft(draft);
+    setBudgetDialogOpen(true);
+  };
+
+  const saveBudgets = () => {
+    const next: Record<string, number> = {};
+    for (const c of CATEGORIES) {
+      const n = Number((budgetDraft[c] ?? "").replace(/[^\d]/g, ""));
+      if (n > 0) next[c] = n;
+    }
+    setBudgets(next);
+    try {
+      localStorage.setItem(budgetStorageKey, JSON.stringify(next));
+    } catch {
+      // ignore
+    }
+    setBudgetDialogOpen(false);
+    toast.success("예산이 저장되었습니다");
+  };
+
+  const budgetRows = useMemo(() => {
+    return CATEGORIES.map((c) => {
+      const budget = budgets[c] ?? 0;
+      const spent = monthByCategory.get(c) ?? 0;
+      const ratio = budget > 0 ? spent / budget : 0;
+      return { category: c, budget, spent, ratio };
+    }).filter((r) => r.budget > 0 || r.spent > 0);
+  }, [budgets, monthByCategory]);
+
+
+
 
   const handleFile = useCallback(
     async (file: File) => {

@@ -380,6 +380,107 @@ function Index() {
           </div>
         </section>
 
+        {/* Budgets */}
+        <section className="rounded-2xl border bg-card p-4 shadow-sm">
+          <div className="flex items-center justify-between mb-3 px-1">
+            <div className="flex items-center gap-1.5">
+              <Target className="size-4 text-primary" />
+              <h2 className="text-sm font-semibold">{monthLabel} 카테고리 예산</h2>
+            </div>
+            <Dialog open={budgetDialogOpen} onOpenChange={setBudgetDialogOpen}>
+              <Button size="sm" variant="outline" onClick={openBudgetDialog} className="h-7 text-xs">
+                예산 설정
+              </Button>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>{monthLabel} 예산 설정</DialogTitle>
+                  <DialogDescription>
+                    카테고리별 목표 금액을 입력해주세요. 비워두면 예산이 해제됩니다.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+                  {CATEGORIES.map((c) => (
+                    <div key={c} className="flex items-center gap-3">
+                      <Label className="w-20 text-sm shrink-0">{c}</Label>
+                      <Input
+                        inputMode="numeric"
+                        placeholder="0"
+                        value={budgetDraft[c] ?? ""}
+                        onChange={(e) =>
+                          setBudgetDraft((prev) => ({ ...prev, [c]: e.target.value }))
+                        }
+                      />
+                      <span className="text-xs text-muted-foreground shrink-0">원</span>
+                    </div>
+                  ))}
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setBudgetDialogOpen(false)}>
+                    취소
+                  </Button>
+                  <Button onClick={saveBudgets}>저장</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          {budgetRows.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-4">
+              아직 설정된 예산이 없어요. '예산 설정'을 눌러 시작해보세요!
+            </p>
+          ) : (
+            <ul className="space-y-3">
+              {budgetRows.map(({ category, budget, spent, ratio }) => {
+                const pct = Math.min(ratio * 100, 100);
+                const over = budget > 0 && spent > budget;
+                const warn = budget > 0 && ratio >= 0.7 && !over;
+                const barColor = over
+                  ? "bg-destructive"
+                  : warn
+                    ? "bg-yellow-500"
+                    : "bg-primary";
+                const remaining = budget - spent;
+                const color = CATEGORY_COLORS[category] ?? CATEGORY_COLORS["기타"];
+                return (
+                  <li key={category} className="space-y-1.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className={`font-medium px-2 py-0.5 rounded-full ${color}`}>
+                        {category}
+                      </span>
+                      <span className="tabular-nums text-muted-foreground">
+                        {won(spent)}{budget > 0 && ` / ${won(budget)}`}
+                      </span>
+                    </div>
+                    {budget > 0 ? (
+                      <>
+                        <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                          <div
+                            className={`h-full ${barColor} transition-all`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                        <p
+                          className={`text-[11px] flex items-center gap-1 ${
+                            over ? "text-destructive font-medium" : warn ? "text-yellow-700" : "text-muted-foreground"
+                          }`}
+                        >
+                          {over && <AlertTriangle className="size-3" />}
+                          {over
+                            ? `예산 ${won(spent - budget)} 초과! (${Math.round(ratio * 100)}%)`
+                            : `남은 금액: ${won(remaining)} (${Math.round(ratio * 100)}%)`}
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-[11px] text-muted-foreground">예산 미설정</p>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+
+
         {/* Monthly per-asset summary */}
         {monthByAsset.length > 0 && (
           <section className="rounded-2xl border bg-card p-4 shadow-sm">

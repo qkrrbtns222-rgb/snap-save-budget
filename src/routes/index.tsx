@@ -374,105 +374,91 @@ function Index() {
           </div>
         </section>
 
-        {/* Budgets */}
+        {/* Charts */}
         <section className="rounded-2xl border bg-card p-4 shadow-sm">
-          <div className="flex items-center justify-between mb-3 px-1">
-            <div className="flex items-center gap-1.5">
-              <Target className="size-4 text-primary" />
-              <h2 className="text-sm font-semibold">{monthLabel} 카테고리 예산</h2>
-            </div>
-            <Dialog open={budgetDialogOpen} onOpenChange={setBudgetDialogOpen}>
-              <Button size="sm" variant="outline" onClick={openBudgetDialog} className="h-7 text-xs">
-                예산 설정
-              </Button>
-              <DialogContent className="max-w-md">
-                <DialogHeader>
-                  <DialogTitle>{monthLabel} 예산 설정</DialogTitle>
-                  <DialogDescription>
-                    카테고리별 목표 금액을 입력해주세요. 비워두면 예산이 해제됩니다.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
-                  {CATEGORIES.map((c) => (
-                    <div key={c} className="flex items-center gap-3">
-                      <Label className="w-20 text-sm shrink-0">{c}</Label>
-                      <Input
-                        inputMode="numeric"
-                        placeholder="0"
-                        value={budgetDraft[c] ?? ""}
-                        onChange={(e) =>
-                          setBudgetDraft((prev) => ({ ...prev, [c]: e.target.value }))
-                        }
-                      />
-                      <span className="text-xs text-muted-foreground shrink-0">원</span>
-                    </div>
-                  ))}
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setBudgetDialogOpen(false)}>
-                    취소
-                  </Button>
-                  <Button onClick={saveBudgets}>저장</Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+          <div className="flex items-center gap-1.5 mb-3 px-1">
+            <BarChart3 className="size-4 text-primary" />
+            <h2 className="text-sm font-semibold">{monthLabel} 일별 지출</h2>
           </div>
-
-          {budgetRows.length === 0 ? (
-            <p className="text-xs text-muted-foreground text-center py-4">
-              아직 설정된 예산이 없어요. '예산 설정'을 눌러 시작해보세요!
+          {monthTotal === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-6">
+              이번 달 지출 내역이 없어요
             </p>
           ) : (
-            <ul className="space-y-3">
-              {budgetRows.map(({ category, budget, spent, ratio }) => {
-                const pct = Math.min(ratio * 100, 100);
-                const over = budget > 0 && spent > budget;
-                const warn = budget > 0 && ratio >= 0.7 && !over;
-                const barColor = over
-                  ? "bg-destructive"
-                  : warn
-                    ? "bg-yellow-500"
-                    : "bg-primary";
-                const remaining = budget - spent;
-                const color = CATEGORY_COLORS[category] ?? CATEGORY_COLORS["기타"];
-                return (
-                  <li key={category} className="space-y-1.5">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className={`font-medium px-2 py-0.5 rounded-full ${color}`}>
-                        {category}
-                      </span>
-                      <span className="tabular-nums text-muted-foreground">
-                        {won(spent)}{budget > 0 && ` / ${won(budget)}`}
-                      </span>
-                    </div>
-                    {budget > 0 ? (
-                      <>
-                        <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
-                          <div
-                            className={`h-full ${barColor} transition-all`}
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-                        <p
-                          className={`text-[11px] flex items-center gap-1 ${
-                            over ? "text-destructive font-medium" : warn ? "text-yellow-700" : "text-muted-foreground"
-                          }`}
-                        >
-                          {over && <AlertTriangle className="size-3" />}
-                          {over
-                            ? `예산 ${won(spent - budget)} 초과! (${Math.round(ratio * 100)}%)`
-                            : `남은 금액: ${won(remaining)} (${Math.round(ratio * 100)}%)`}
-                        </p>
-                      </>
-                    ) : (
-                      <p className="text-[11px] text-muted-foreground">예산 미설정</p>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
+            <div className="h-44 -ml-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={dailySeries} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fontSize: 10 }}
+                    interval={Math.max(0, Math.floor(dailySeries.length / 8) - 1)}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 10 }}
+                    tickFormatter={(v: number) =>
+                      v >= 10000 ? `${Math.round(v / 1000) / 10}만` : v >= 1000 ? `${v / 1000}천` : String(v)
+                    }
+                    axisLine={false}
+                    tickLine={false}
+                    width={40}
+                  />
+                  <Tooltip
+                    formatter={(v: number) => [won(v), "지출"]}
+                    labelFormatter={(l) => `${l}일`}
+                    contentStyle={{ fontSize: 12, borderRadius: 8 }}
+                  />
+                  <Bar dataKey="total" fill="hsl(220 90% 56%)" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           )}
         </section>
+
+        {/* Category chart */}
+        <section className="rounded-2xl border bg-card p-4 shadow-sm">
+          <div className="flex items-center gap-1.5 mb-3 px-1">
+            <BarChart3 className="size-4 text-primary" />
+            <h2 className="text-sm font-semibold">{monthLabel} 카테고리별 지출</h2>
+          </div>
+          {monthByCategory.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-6">
+              이번 달 지출 내역이 없어요
+            </p>
+          ) : (
+            <div className="h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={monthByCategory}
+                    dataKey="total"
+                    nameKey="category"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={70}
+                    innerRadius={38}
+                    paddingAngle={2}
+                  >
+                    {monthByCategory.map((_, i) => (
+                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    formatter={(v: number, n: string) => [won(v), n]}
+                    contentStyle={{ fontSize: 12, borderRadius: 8 }}
+                  />
+                  <Legend
+                    verticalAlign="bottom"
+                    iconType="circle"
+                    wrapperStyle={{ fontSize: 11 }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </section>
+
 
 
         {/* Monthly per-asset summary */}

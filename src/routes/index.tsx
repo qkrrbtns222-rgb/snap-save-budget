@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Toaster, toast } from "sonner";
-import { Upload, Loader2, Trash2, Sparkles, Wallet, X, Plus } from "lucide-react";
+import { Upload, Loader2, Trash2, Sparkles, Wallet, X, Plus, Target, AlertTriangle } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { analyzeReceipt } from "@/lib/analyze-receipt.functions";
@@ -16,6 +16,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -156,6 +164,78 @@ function Index() {
     const now = new Date();
     return `${now.getFullYear()}년 ${now.getMonth() + 1}월`;
   }, []);
+
+  const monthKey = useMemo(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  }, []);
+
+  const budgetStorageKey = `budgets:${monthKey}`;
+  const [budgets, setBudgets] = useState<Record<string, number>>({});
+  const [budgetDialogOpen, setBudgetDialogOpen] = useState(false);
+  const [budgetDraft, setBudgetDraft] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = localStorage.getItem(budgetStorageKey);
+      if (raw) setBudgets(JSON.parse(raw));
+      else setBudgets({});
+    } catch {
+      setBudgets({});
+    }
+  }, [budgetStorageKey]);
+
+  const monthByCategory = useMemo(() => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth();
+    const map = new Map<string, number>();
+    for (const c of CATEGORIES) map.set(c, 0);
+    for (const e of expenses) {
+      const d = new Date(e.spent_at);
+      if (d.getFullYear() !== y || d.getMonth() !== m) continue;
+      const key = (CATEGORIES as readonly string[]).includes(e.category) ? e.category : "기타";
+      map.set(key, (map.get(key) ?? 0) + Number(e.amount));
+    }
+    return map;
+  }, [expenses]);
+
+  const openBudgetDialog = () => {
+    const draft: Record<string, string> = {};
+    for (const c of CATEGORIES) {
+      draft[c] = budgets[c] ? String(budgets[c]) : "";
+    }
+    setBudgetDraft(draft);
+    setBudgetDialogOpen(true);
+  };
+
+  const saveBudgets = () => {
+    const next: Record<string, number> = {};
+    for (const c of CATEGORIES) {
+      const n = Number((budgetDraft[c] ?? "").replace(/[^\d]/g, ""));
+      if (n > 0) next[c] = n;
+    }
+    setBudgets(next);
+    try {
+      localStorage.setItem(budgetStorageKey, JSON.stringify(next));
+    } catch {
+      // ignore
+    }
+    setBudgetDialogOpen(false);
+    toast.success("예산이 저장되었습니다");
+  };
+
+  const budgetRows = useMemo(() => {
+    return CATEGORIES.map((c) => {
+      const budget = budgets[c] ?? 0;
+      const spent = monthByCategory.get(c) ?? 0;
+      const ratio = budget > 0 ? spent / budget : 0;
+      return { category: c, budget, spent, ratio };
+    }).filter((r) => r.budget > 0 || r.spent > 0);
+  }, [budgets, monthByCategory]);
+
+
 
 
   const handleFile = useCallback(
@@ -299,6 +379,107 @@ function Index() {
             <span>{expenses.length}건</span>
           </div>
         </section>
+
+        {/* Budgets */}
+        <section className="rounded-2xl border bg-card p-4 shadow-sm">
+          <div className="flex items-center justify-between mb-3 px-1">
+            <div className="flex items-center gap-1.5">
+              <Target className="size-4 text-primary" />
+              <h2 className="text-sm font-semibold">{monthLabel} 카테고리 예산</h2>
+            </div>
+            <Dialog open={budgetDialogOpen} onOpenChange={setBudgetDialogOpen}>
+              <Button size="sm" variant="outline" onClick={openBudgetDialog} className="h-7 text-xs">
+                예산 설정
+              </Button>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>{monthLabel} 예산 설정</DialogTitle>
+                  <DialogDescription>
+                    카테고리별 목표 금액을 입력해주세요. 비워두면 예산이 해제됩니다.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+                  {CATEGORIES.map((c) => (
+                    <div key={c} className="flex items-center gap-3">
+                      <Label className="w-20 text-sm shrink-0">{c}</Label>
+                      <Input
+                        inputMode="numeric"
+                        placeholder="0"
+                        value={budgetDraft[c] ?? ""}
+                        onChange={(e) =>
+                          setBudgetDraft((prev) => ({ ...prev, [c]: e.target.value }))
+                        }
+                      />
+                      <span className="text-xs text-muted-foreground shrink-0">원</span>
+                    </div>
+                  ))}
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setBudgetDialogOpen(false)}>
+                    취소
+                  </Button>
+                  <Button onClick={saveBudgets}>저장</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          {budgetRows.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-4">
+              아직 설정된 예산이 없어요. '예산 설정'을 눌러 시작해보세요!
+            </p>
+          ) : (
+            <ul className="space-y-3">
+              {budgetRows.map(({ category, budget, spent, ratio }) => {
+                const pct = Math.min(ratio * 100, 100);
+                const over = budget > 0 && spent > budget;
+                const warn = budget > 0 && ratio >= 0.7 && !over;
+                const barColor = over
+                  ? "bg-destructive"
+                  : warn
+                    ? "bg-yellow-500"
+                    : "bg-primary";
+                const remaining = budget - spent;
+                const color = CATEGORY_COLORS[category] ?? CATEGORY_COLORS["기타"];
+                return (
+                  <li key={category} className="space-y-1.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className={`font-medium px-2 py-0.5 rounded-full ${color}`}>
+                        {category}
+                      </span>
+                      <span className="tabular-nums text-muted-foreground">
+                        {won(spent)}{budget > 0 && ` / ${won(budget)}`}
+                      </span>
+                    </div>
+                    {budget > 0 ? (
+                      <>
+                        <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                          <div
+                            className={`h-full ${barColor} transition-all`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                        <p
+                          className={`text-[11px] flex items-center gap-1 ${
+                            over ? "text-destructive font-medium" : warn ? "text-yellow-700" : "text-muted-foreground"
+                          }`}
+                        >
+                          {over && <AlertTriangle className="size-3" />}
+                          {over
+                            ? `예산 ${won(spent - budget)} 초과! (${Math.round(ratio * 100)}%)`
+                            : `남은 금액: ${won(remaining)} (${Math.round(ratio * 100)}%)`}
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-[11px] text-muted-foreground">예산 미설정</p>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+
 
         {/* Monthly per-asset summary */}
         {monthByAsset.length > 0 && (

@@ -584,6 +584,33 @@ function Index() {
           </section>
         )}
 
+        {/* Quick add */}
+        <section className="rounded-2xl bg-card border p-4 shadow-sm">
+          <div className="flex items-center gap-1.5 mb-2 px-1">
+            <Plus className="size-4 text-primary" />
+            <h2 className="text-sm font-semibold">텍스트로 빠르게 추가</h2>
+          </div>
+          <div className="flex gap-2">
+            <Input
+              value={quickText}
+              onChange={(e) => setQuickText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addQuickDraft();
+                }
+              }}
+              placeholder="예: 식비 25000원 스타벅스 / 쇼핑 50000원 나이키"
+              className="flex-1"
+            />
+            <Button onClick={addQuickDraft} disabled={!quickText.trim()}>
+              추가
+            </Button>
+          </div>
+          <p className="text-[11px] text-muted-foreground mt-2 px-1">
+            카테고리·금액·사용처를 자유롭게 입력하세요. 추가된 내역은 아래 카드에서 수정 후 저장할 수 있어요.
+          </p>
+        </section>
 
 
         {/* Upload */}

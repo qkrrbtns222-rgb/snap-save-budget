@@ -13,10 +13,13 @@ export const analyzeReceipt = createServerFn({ method: "POST" })
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) throw new Error("LOVABLE_API_KEY가 설정되어 있지 않습니다.");
 
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
     const systemPrompt = `당신은 한국 결제 영수증/문자/은행앱 스크린샷을 분석하는 전문가입니다.
+오늘 날짜는 ${todayStr} 입니다. 이미지에 연도가 표시되지 않은 경우 반드시 올해(${today.getFullYear()})를 사용하세요. 미래 날짜가 되면 작년을 사용하세요.
 이미지에 **여러 건의 결제 내역**이 포함될 수 있습니다 (예: 거래내역 목록, 여러 영수증을 한 장에 모은 사진 등).
 각 결제 건마다 다음 정보를 추출해 배열로 반환하세요:
-- 결제일시 (날짜와 시간, ISO 8601 형식)
+- 결제일시 (날짜와 시간, ISO 8601 형식). 날짜 정보가 전혀 없으면 오늘(${todayStr})을 사용하세요.
 - 가맹점/사용처 (브랜드명만 간결하게)
 - 결제 금액 (쉼표, '원' 제거한 순수 정수, 양수)
 - 카테고리 (다음 중 하나: ${CATEGORIES.join(", ")})

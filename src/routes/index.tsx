@@ -129,6 +129,7 @@ function Index() {
   const [draftList, setDraftList] = useState<Draft[]>([]);
   const [preview, setPreview] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [quickText, setQuickText] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadExpenses = useCallback(async () => {

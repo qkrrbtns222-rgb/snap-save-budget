@@ -1,0 +1,1 @@
+UPDATE public.expenses SET spent_at = spent_at + INTERVAL '1 year' WHERE spent_at < '2026-01-01' AND spent_at >= '2025-01-01';

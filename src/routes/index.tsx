@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Toaster, toast } from "sonner";
-import { Upload, Loader2, Trash2, Sparkles, Wallet, X, Plus, BarChart3, RotateCcw } from "lucide-react";
+import { Upload, Loader2, Trash2, Sparkles, Wallet, X, Plus, BarChart3, RotateCcw, Share2, Download, Copy } from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -451,6 +451,77 @@ function Index() {
     }
   };
 
+  const buildExportText = () => {
+    if (expenses.length === 0) return "";
+    const now = new Date();
+    const ym = `${now.getFullYear()}년 ${now.getMonth() + 1}월`;
+    const monthExpenses = expenses.filter((e) => {
+      const d = new Date(e.spent_at);
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+    });
+    const total = monthExpenses.reduce((s, e) => s + Number(e.amount), 0);
+    const byCat = new Map<string, number>();
+    monthExpenses.forEach((e) => byCat.set(e.category, (byCat.get(e.category) ?? 0) + Number(e.amount)));
+    const lines = [`📊 ${ym} 가계부`, `💰 총지출: ${won(total)} (${monthExpenses.length}건)`, ""];
+    if (byCat.size > 0) {
+      lines.push("📂 카테고리별");
+      [...byCat.entries()].sort((a, b) => b[1] - a[1]).forEach(([c, v]) => lines.push(`  • ${c}: ${won(v)}`));
+      lines.push("");
+    }
+    lines.push("📝 상세 내역");
+    monthExpenses.forEach((e) => {
+      const d = new Date(e.spent_at);
+      const ds = `${d.getMonth() + 1}/${d.getDate()}`;
+      const asset = e.asset ? ` [${e.asset}]` : "";
+      lines.push(`  ${ds} ${e.category} ${e.merchant} ${won(Number(e.amount))}${asset}`);
+    });
+    return lines.join("\n");
+  };
+
+  const copyExportText = async () => {
+    const text = buildExportText();
+    if (!text) return toast.error("내보낼 내역이 없어요");
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("복사 완료! 카톡에 붙여넣으세요");
+    } catch {
+      toast.error("복사 실패");
+    }
+  };
+
+  const shareExportText = async () => {
+    const text = buildExportText();
+    if (!text) return toast.error("내보낼 내역이 없어요");
+    if (navigator.share) {
+      try {
+        await navigator.share({ text, title: "가계부 내역" });
+      } catch {}
+    } else {
+      copyExportText();
+    }
+  };
+
+  const downloadCSV = () => {
+    if (expenses.length === 0) return toast.error("내보낼 내역이 없어요");
+    const header = ["날짜", "카테고리", "사용처", "금액", "결제수단", "메모"];
+    const rows = expenses.map((e) => {
+      const d = new Date(e.spent_at);
+      const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      return [ds, e.category, e.merchant, String(e.amount), e.asset ?? "", e.memo ?? ""];
+    });
+    const escape = (v: string) => `"${v.replace(/"/g, '""')}"`;
+    const csv = "\uFEFF" + [header, ...rows].map((r) => r.map(escape).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const now = new Date();
+    a.href = url;
+    a.download = `가계부_${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("CSV 다운로드 완료");
+  };
+
   return (
     <div className="min-h-screen bg-background pb-24">
       <Toaster position="top-center" richColors />
@@ -857,6 +928,19 @@ function Index() {
               </AlertDialog>
             )}
           </div>
+          {expenses.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 mb-3 px-1">
+              <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" onClick={shareExportText}>
+                <Share2 className="size-3.5" /> 카톡으로 공유
+              </Button>
+              <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" onClick={copyExportText}>
+                <Copy className="size-3.5" /> 텍스트 복사
+              </Button>
+              <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" onClick={downloadCSV}>
+                <Download className="size-3.5" /> CSV 저장
+              </Button>
+            </div>
+          )}
           {expenses.length === 0 ? (
             <div className="rounded-2xl border bg-card p-10 text-center text-sm text-muted-foreground">
               아직 저장된 내역이 없어요.<br />첫 스크린샷을 올려보세요!

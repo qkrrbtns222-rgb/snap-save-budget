@@ -129,6 +129,7 @@ function Index() {
   const [draftList, setDraftList] = useState<Draft[]>([]);
   const [preview, setPreview] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [quickText, setQuickText] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadExpenses = useCallback(async () => {
@@ -231,6 +232,101 @@ function Index() {
 
 
 
+
+  const parseQuickText = useCallback((raw: string): Draft | null => {
+    const text = raw.trim();
+    if (!text) return null;
+
+    // 금액: "25,000원", "25000원", "2만원", "2.5만", "15천원"
+    let amount = 0;
+    let amountMatch: RegExpMatchArray | null = null;
+    const manMatch = text.match(/(\d+(?:[.,]\d+)?)\s*만\s*원?/);
+    const cheonMatch = text.match(/(\d+(?:[.,]\d+)?)\s*천\s*원?/);
+    const plainMatch = text.match(/([\d,]+)\s*원/);
+    const numOnly = text.match(/\b(\d{3,})\b/);
+    if (manMatch) {
+      amount = Math.round(Number(manMatch[1].replace(/,/g, "")) * 10000);
+      amountMatch = manMatch;
+    } else if (cheonMatch) {
+      amount = Math.round(Number(cheonMatch[1].replace(/,/g, "")) * 1000);
+      amountMatch = cheonMatch;
+    } else if (plainMatch) {
+      amount = Number(plainMatch[1].replace(/,/g, ""));
+      amountMatch = plainMatch;
+    } else if (numOnly) {
+      amount = Number(numOnly[1]);
+      amountMatch = numOnly;
+    }
+    if (!amount || amount <= 0) return null;
+
+    // 카테고리
+    let category: Category = "기타";
+    for (const c of CATEGORIES) {
+      if (text.includes(c)) {
+        category = c;
+        break;
+      }
+    }
+    // 키워드 보강
+    const keywordMap: Array<[RegExp, Category]> = [
+      [/(스타벅스|커피|카페|이디야|투썸|메가|컴포즈)/, "카페"],
+      [/(택시|버스|지하철|주유|기차|ktx|카카오t)/i, "교통"],
+      [/(병원|약국|의원|치과)/, "의료"],
+      [/(나이키|아디다스|쿠팡|무신사|쇼핑|백화점|올리브영)/, "쇼핑"],
+      [/(영화|cgv|메가박스|공연|콘서트|넷플릭스)/i, "문화/여가"],
+      [/(통신|관리비|월세|전기|수도|가스)/, "주거/통신"],
+      [/(편의점|gs25|cu|세븐일레븐|이마트|홈플러스|마트|식당|배달|치킨|국밥|라면|김밥)/i, "식비"],
+    ];
+    if (category === "기타") {
+      for (const [re, c] of keywordMap) {
+        if (re.test(text)) {
+          category = c;
+          break;
+        }
+      }
+    }
+
+    // 결제수단
+    let asset = "기타";
+    for (const a of ASSETS) {
+      if (text.includes(a)) {
+        asset = a;
+        break;
+      }
+    }
+
+    // 사용처: 카테고리/금액/결제수단 토큰을 제거하고 남은 텍스트
+    let rest = text;
+    if (amountMatch) rest = rest.replace(amountMatch[0], " ");
+    rest = rest.replace(category, " ");
+    if (asset !== "기타") rest = rest.replace(asset, " ");
+    rest = rest
+      .replace(/[\/,·\-—]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    const merchant = rest || category;
+
+    return {
+      id: makeDraftId(),
+      spent_at: toLocalInput(new Date().toISOString()),
+      merchant,
+      amount: String(amount),
+      category,
+      asset,
+      memo: "",
+    };
+  }, []);
+
+  const addQuickDraft = useCallback(() => {
+    const draft = parseQuickText(quickText);
+    if (!draft) {
+      toast.error("금액을 인식하지 못했어요. 예: 식비 25000원 스타벅스");
+      return;
+    }
+    setDraftList((prev) => [...prev, draft]);
+    setQuickText("");
+    toast.success("내역이 추가되었어요");
+  }, [quickText, parseQuickText]);
 
   const handleFile = useCallback(
     async (file: File) => {
@@ -488,6 +584,33 @@ function Index() {
           </section>
         )}
 
+        {/* Quick add */}
+        <section className="rounded-2xl bg-card border p-4 shadow-sm">
+          <div className="flex items-center gap-1.5 mb-2 px-1">
+            <Plus className="size-4 text-primary" />
+            <h2 className="text-sm font-semibold">텍스트로 빠르게 추가</h2>
+          </div>
+          <div className="flex gap-2">
+            <Input
+              value={quickText}
+              onChange={(e) => setQuickText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addQuickDraft();
+                }
+              }}
+              placeholder="예: 식비 25000원 스타벅스 / 쇼핑 50000원 나이키"
+              className="flex-1"
+            />
+            <Button onClick={addQuickDraft} disabled={!quickText.trim()}>
+              추가
+            </Button>
+          </div>
+          <p className="text-[11px] text-muted-foreground mt-2 px-1">
+            카테고리·금액·사용처를 자유롭게 입력하세요. 추가된 내역은 아래 카드에서 수정 후 저장할 수 있어요.
+          </p>
+        </section>
 
 
         {/* Upload */}

@@ -928,6 +928,19 @@ function Index() {
               </AlertDialog>
             )}
           </div>
+          {expenses.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 mb-3 px-1">
+              <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" onClick={shareExportText}>
+                <Share2 className="size-3.5" /> 카톡으로 공유
+              </Button>
+              <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" onClick={copyExportText}>
+                <Copy className="size-3.5" /> 텍스트 복사
+              </Button>
+              <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" onClick={downloadCSV}>
+                <Download className="size-3.5" /> CSV 저장
+              </Button>
+            </div>
+          )}
           {expenses.length === 0 ? (
             <div className="rounded-2xl border bg-card p-10 text-center text-sm text-muted-foreground">
               아직 저장된 내역이 없어요.<br />첫 스크린샷을 올려보세요!

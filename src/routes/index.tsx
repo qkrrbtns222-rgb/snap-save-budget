@@ -478,27 +478,64 @@ function Index() {
     return lines.join("\n");
   };
 
+  const fallbackCopy = (text: string) => {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      ta.setAttribute("readonly", "");
+      document.body.appendChild(ta);
+      ta.select();
+      ta.setSelectionRange(0, text.length);
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return ok;
+    } catch {
+      return false;
+    }
+  };
+
   const copyExportText = async () => {
     const text = buildExportText();
     if (!text) return toast.error("내보낼 내역이 없어요");
     try {
-      await navigator.clipboard.writeText(text);
-      toast.success("복사 완료! 카톡에 붙여넣으세요");
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        toast.success("복사 완료! 카톡에 붙여넣으세요");
+        return;
+      }
+      throw new Error("no clipboard");
     } catch {
-      toast.error("복사 실패");
+      if (fallbackCopy(text)) {
+        toast.success("복사 완료! 카톡에 붙여넣으세요");
+      } else {
+        // 마지막 폴백: 새 창에 텍스트 표시
+        const w = window.open("", "_blank");
+        if (w) {
+          w.document.write(`<pre style="white-space:pre-wrap;font-family:system-ui;padding:16px">${text.replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c]!))}</pre>`);
+          w.document.close();
+          toast.success("새 창에서 내용을 길게 눌러 복사하세요");
+        } else {
+          toast.error("복사 실패 - 브라우저 권한을 확인하세요");
+        }
+      }
     }
   };
 
   const shareExportText = async () => {
     const text = buildExportText();
     if (!text) return toast.error("내보낼 내역이 없어요");
-    if (navigator.share) {
-      try {
+    try {
+      if (navigator.share) {
         await navigator.share({ text, title: "가계부 내역" });
-      } catch {}
-    } else {
-      copyExportText();
+        return;
+      }
+    } catch (err) {
+      // 사용자가 취소했거나 권한 거부 - 폴백
+      if ((err as Error).name === "AbortError") return;
     }
+    copyExportText();
   };
 
   const downloadCSV = () => {
@@ -511,15 +548,30 @@ function Index() {
     });
     const escape = (v: string) => `"${v.replace(/"/g, '""')}"`;
     const csv = "\uFEFF" + [header, ...rows].map((r) => r.map(escape).join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
     const now = new Date();
-    a.href = url;
-    a.download = `가계부_${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success("CSV 다운로드 완료");
+    const filename = `가계부_${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}.csv`;
+    try {
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.rel = "noopener";
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 100);
+      toast.success("CSV 다운로드 완료");
+    } catch {
+      // 폴백: data URL을 새 탭으로 열기 (iframe 차단 시)
+      const dataUrl = "data:text/csv;charset=utf-8," + encodeURIComponent(csv);
+      const w = window.open(dataUrl, "_blank");
+      if (w) toast.success("새 탭에서 CSV를 저장하세요");
+      else toast.error("다운로드 실패 - 새 탭에서 열어주세요");
+    }
   };
 
   return (

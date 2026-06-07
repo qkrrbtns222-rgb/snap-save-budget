@@ -554,6 +554,26 @@ function Index() {
           </div>
         </section>
 
+        {/* Month selector */}
+        <div className="flex items-center gap-2 px-1">
+          <Label className="text-xs text-muted-foreground">조회 월</Label>
+          <Select value={selectedYM} onValueChange={setSelectedYM}>
+            <SelectTrigger className="h-8 w-auto min-w-32 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {availableMonths.map((ym) => {
+                const [y, m] = ym.split("-");
+                return (
+                  <SelectItem key={ym} value={ym}>
+                    {y}년 {Number(m)}월
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
+        </div>
+
         {/* Charts */}
         <section className="rounded-2xl border bg-card p-4 shadow-sm">
           <div className="flex items-center gap-1.5 mb-3 px-1">

@@ -455,13 +455,12 @@ function Index() {
   };
 
   const buildExportText = () => {
-    if (expenses.length === 0) return "";
-    const now = new Date();
-    const ym = `${now.getFullYear()}년 ${now.getMonth() + 1}월`;
+    const ym = `${selY}년 ${selM + 1}월`;
     const monthExpenses = expenses.filter((e) => {
       const d = new Date(e.spent_at);
-      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+      return d.getFullYear() === selY && d.getMonth() === selM;
     });
+    if (monthExpenses.length === 0) return "";
     const total = monthExpenses.reduce((s, e) => s + Number(e.amount), 0);
     const byCat = new Map<string, number>();
     monthExpenses.forEach((e) => byCat.set(e.category, (byCat.get(e.category) ?? 0) + Number(e.amount)));

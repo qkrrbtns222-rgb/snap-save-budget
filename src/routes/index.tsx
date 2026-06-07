@@ -525,56 +525,6 @@ function Index() {
     }
   };
 
-  const shareExportText = async () => {
-    const text = buildExportText();
-    if (!text) return toast.error("내보낼 내역이 없어요");
-    try {
-      if (navigator.share) {
-        await navigator.share({ text, title: "가계부 내역" });
-        return;
-      }
-    } catch (err) {
-      // 사용자가 취소했거나 권한 거부 - 폴백
-      if ((err as Error).name === "AbortError") return;
-    }
-    copyExportText();
-  };
-
-  const downloadCSV = () => {
-    if (expenses.length === 0) return toast.error("내보낼 내역이 없어요");
-    const header = ["날짜", "카테고리", "사용처", "금액", "결제수단", "메모"];
-    const rows = expenses.map((e) => {
-      const d = new Date(e.spent_at);
-      const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-      return [ds, e.category, e.merchant, String(e.amount), e.asset ?? "", e.memo ?? ""];
-    });
-    const escape = (v: string) => `"${v.replace(/"/g, '""')}"`;
-    const csv = "\uFEFF" + [header, ...rows].map((r) => r.map(escape).join(",")).join("\n");
-    const now = new Date();
-    const filename = `가계부_${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}.csv`;
-    try {
-      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      a.rel = "noopener";
-      a.style.display = "none";
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(() => {
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      }, 100);
-      toast.success("CSV 다운로드 완료");
-    } catch {
-      // 폴백: data URL을 새 탭으로 열기 (iframe 차단 시)
-      const dataUrl = "data:text/csv;charset=utf-8," + encodeURIComponent(csv);
-      const w = window.open(dataUrl, "_blank");
-      if (w) toast.success("새 탭에서 CSV를 저장하세요");
-      else toast.error("다운로드 실패 - 새 탭에서 열어주세요");
-    }
-  };
 
   return (
     <div className="min-h-screen bg-background pb-24">

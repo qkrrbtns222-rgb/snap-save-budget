@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Toaster, toast } from "sonner";
-import { Upload, Loader2, Trash2, Sparkles, Wallet, X, Plus, BarChart3, RotateCcw, Share2, Download, Copy } from "lucide-react";
+import { Upload, Loader2, Trash2, Sparkles, Wallet, X, Plus, BarChart3, RotateCcw, Copy } from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -150,46 +150,52 @@ function Index() {
     [expenses],
   );
 
+  const ymKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  const currentYM = ymKey(new Date());
+  const [selectedYM, setSelectedYM] = useState<string>(currentYM);
+
+  const availableMonths = useMemo(() => {
+    const set = new Set<string>([currentYM]);
+    for (const e of expenses) {
+      const d = new Date(e.spent_at);
+      if (!isNaN(d.getTime())) set.add(ymKey(d));
+    }
+    return Array.from(set).sort((a, b) => b.localeCompare(a));
+  }, [expenses, currentYM]);
+
+  const [selY, selM] = useMemo(() => {
+    const [y, m] = selectedYM.split("-").map(Number);
+    return [y, m - 1];
+  }, [selectedYM]);
+
+  const monthLabel = useMemo(() => `${selY}년 ${selM + 1}월`, [selY, selM]);
+
   const monthTotal = useMemo(() => {
-    const now = new Date();
-    const y = now.getFullYear();
-    const m = now.getMonth();
     return expenses
       .filter((e) => {
         const d = new Date(e.spent_at);
-        return d.getFullYear() === y && d.getMonth() === m;
+        return d.getFullYear() === selY && d.getMonth() === selM;
       })
       .reduce((sum, e) => sum + Number(e.amount), 0);
-  }, [expenses]);
+  }, [expenses, selY, selM]);
 
   const monthByAsset = useMemo(() => {
-    const now = new Date();
-    const y = now.getFullYear();
-    const m = now.getMonth();
     const map = new Map<string, number>();
     for (const e of expenses) {
       const d = new Date(e.spent_at);
-      if (d.getFullYear() !== y || d.getMonth() !== m) continue;
+      if (d.getFullYear() !== selY || d.getMonth() !== selM) continue;
       const key = e.asset || "기타";
       map.set(key, (map.get(key) ?? 0) + Number(e.amount));
     }
     return Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
-  }, [expenses]);
-
-  const monthLabel = useMemo(() => {
-    const now = new Date();
-    return `${now.getFullYear()}년 ${now.getMonth() + 1}월`;
-  }, []);
+  }, [expenses, selY, selM]);
 
   const monthByCategory = useMemo(() => {
-    const now = new Date();
-    const y = now.getFullYear();
-    const m = now.getMonth();
     const map = new Map<string, number>();
     for (const c of CATEGORIES) map.set(c, 0);
     for (const e of expenses) {
       const d = new Date(e.spent_at);
-      if (d.getFullYear() !== y || d.getMonth() !== m) continue;
+      if (d.getFullYear() !== selY || d.getMonth() !== selM) continue;
       const key = (CATEGORIES as readonly string[]).includes(e.category) ? e.category : "기타";
       map.set(key, (map.get(key) ?? 0) + Number(e.amount));
     }
@@ -197,13 +203,10 @@ function Index() {
       .filter(([, v]) => v > 0)
       .map(([category, total]) => ({ category, total }))
       .sort((a, b) => b.total - a.total);
-  }, [expenses]);
+  }, [expenses, selY, selM]);
 
   const dailySeries = useMemo(() => {
-    const now = new Date();
-    const y = now.getFullYear();
-    const m = now.getMonth();
-    const days = new Date(y, m + 1, 0).getDate();
+    const days = new Date(selY, selM + 1, 0).getDate();
     const arr = Array.from({ length: days }, (_, i) => ({
       day: i + 1,
       label: `${i + 1}`,
@@ -211,11 +214,11 @@ function Index() {
     }));
     for (const e of expenses) {
       const d = new Date(e.spent_at);
-      if (d.getFullYear() !== y || d.getMonth() !== m) continue;
+      if (d.getFullYear() !== selY || d.getMonth() !== selM) continue;
       arr[d.getDate() - 1].total += Number(e.amount);
     }
     return arr;
-  }, [expenses]);
+  }, [expenses, selY, selM]);
 
   const PIE_COLORS = [
     "hsl(220 90% 56%)",
@@ -452,13 +455,12 @@ function Index() {
   };
 
   const buildExportText = () => {
-    if (expenses.length === 0) return "";
-    const now = new Date();
-    const ym = `${now.getFullYear()}년 ${now.getMonth() + 1}월`;
+    const ym = `${selY}년 ${selM + 1}월`;
     const monthExpenses = expenses.filter((e) => {
       const d = new Date(e.spent_at);
-      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+      return d.getFullYear() === selY && d.getMonth() === selM;
     });
+    if (monthExpenses.length === 0) return "";
     const total = monthExpenses.reduce((s, e) => s + Number(e.amount), 0);
     const byCat = new Map<string, number>();
     monthExpenses.forEach((e) => byCat.set(e.category, (byCat.get(e.category) ?? 0) + Number(e.amount)));
@@ -523,56 +525,6 @@ function Index() {
     }
   };
 
-  const shareExportText = async () => {
-    const text = buildExportText();
-    if (!text) return toast.error("내보낼 내역이 없어요");
-    try {
-      if (navigator.share) {
-        await navigator.share({ text, title: "가계부 내역" });
-        return;
-      }
-    } catch (err) {
-      // 사용자가 취소했거나 권한 거부 - 폴백
-      if ((err as Error).name === "AbortError") return;
-    }
-    copyExportText();
-  };
-
-  const downloadCSV = () => {
-    if (expenses.length === 0) return toast.error("내보낼 내역이 없어요");
-    const header = ["날짜", "카테고리", "사용처", "금액", "결제수단", "메모"];
-    const rows = expenses.map((e) => {
-      const d = new Date(e.spent_at);
-      const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-      return [ds, e.category, e.merchant, String(e.amount), e.asset ?? "", e.memo ?? ""];
-    });
-    const escape = (v: string) => `"${v.replace(/"/g, '""')}"`;
-    const csv = "\uFEFF" + [header, ...rows].map((r) => r.map(escape).join(",")).join("\n");
-    const now = new Date();
-    const filename = `가계부_${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}.csv`;
-    try {
-      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      a.rel = "noopener";
-      a.style.display = "none";
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(() => {
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      }, 100);
-      toast.success("CSV 다운로드 완료");
-    } catch {
-      // 폴백: data URL을 새 탭으로 열기 (iframe 차단 시)
-      const dataUrl = "data:text/csv;charset=utf-8," + encodeURIComponent(csv);
-      const w = window.open(dataUrl, "_blank");
-      if (w) toast.success("새 탭에서 CSV를 저장하세요");
-      else toast.error("다운로드 실패 - 새 탭에서 열어주세요");
-    }
-  };
 
   return (
     <div className="min-h-screen bg-background pb-24">
@@ -601,6 +553,26 @@ function Index() {
             <span>{expenses.length}건</span>
           </div>
         </section>
+
+        {/* Month selector */}
+        <div className="flex items-center gap-2 px-1">
+          <Label className="text-xs text-muted-foreground">조회 월</Label>
+          <Select value={selectedYM} onValueChange={setSelectedYM}>
+            <SelectTrigger className="h-8 w-auto min-w-32 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {availableMonths.map((ym) => {
+                const [y, m] = ym.split("-");
+                return (
+                  <SelectItem key={ym} value={ym}>
+                    {y}년 {Number(m)}월
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
+        </div>
 
         {/* Charts */}
         <section className="rounded-2xl border bg-card p-4 shadow-sm">
@@ -982,14 +954,8 @@ function Index() {
           </div>
           {expenses.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 mb-3 px-1">
-              <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" onClick={shareExportText}>
-                <Share2 className="size-3.5" /> 카톡으로 공유
-              </Button>
               <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" onClick={copyExportText}>
-                <Copy className="size-3.5" /> 텍스트 복사
-              </Button>
-              <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" onClick={downloadCSV}>
-                <Download className="size-3.5" /> CSV 저장
+                <Copy className="size-3.5" /> {monthLabel} 텍스트 복사
               </Button>
             </div>
           )}

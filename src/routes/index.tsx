@@ -468,10 +468,6 @@ function Index() {
 
   const buildExportText = () => {
     const ym = `${selY}년 ${selM + 1}월`;
-    const monthExpenses = expenses.filter((e) => {
-      const d = new Date(e.spent_at);
-      return d.getFullYear() === selY && d.getMonth() === selM;
-    });
     if (monthExpenses.length === 0) return "";
     const total = monthExpenses.reduce((s, e) => s + Number(e.amount), 0);
     const byCat = new Map<string, number>();
@@ -578,24 +574,29 @@ function Index() {
         </section>
 
         {/* Month selector */}
-        <div className="flex items-center gap-2 px-1">
-          <Label className="text-xs text-muted-foreground">조회 월</Label>
-          <Select value={selectedYM} onValueChange={setSelectedYM}>
-            <SelectTrigger className="h-8 w-auto min-w-32 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {availableMonths.map((ym) => {
-                const [y, m] = ym.split("-");
-                return (
-                  <SelectItem key={ym} value={ym}>
-                    {y}년 {Number(m)}월
-                  </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
-        </div>
+        <section className="rounded-2xl border bg-card p-4 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold">조회 월</p>
+              <p className="text-xs text-muted-foreground">보고 싶은 달만 골라서 요약과 복사 내용을 바꿔볼 수 있어요</p>
+            </div>
+            <Select value={selectedYM} onValueChange={setSelectedYM}>
+              <SelectTrigger className="h-10 min-w-36 text-sm shrink-0">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {availableMonths.map((ym) => {
+                  const [y, m] = ym.split("-");
+                  return (
+                    <SelectItem key={ym} value={ym}>
+                      {y}년 {Number(m)}월
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          </div>
+        </section>
 
         {/* Charts */}
         <section className="rounded-2xl border bg-card p-4 shadow-sm">
@@ -963,7 +964,7 @@ function Index() {
         <section>
           <div className="flex items-center justify-between mb-3 px-1">
             <h2 className="font-semibold">
-              최근 내역 <span className="text-xs text-muted-foreground font-normal">({expenses.length}건)</span>
+              최근 내역 <span className="text-xs text-muted-foreground font-normal">({monthExpenses.length}건)</span>
             </h2>
             {expenses.length > 0 && (
               <AlertDialog>
@@ -992,20 +993,20 @@ function Index() {
               </AlertDialog>
             )}
           </div>
-          {expenses.length > 0 && (
+          {monthExpenses.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 mb-3 px-1">
               <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" onClick={copyExportText}>
                 <Copy className="size-3.5" /> {monthLabel} 텍스트 복사
               </Button>
             </div>
           )}
-          {expenses.length === 0 ? (
+          {monthExpenses.length === 0 ? (
             <div className="rounded-2xl border bg-card p-10 text-center text-sm text-muted-foreground">
-              아직 저장된 내역이 없어요.<br />첫 스크린샷을 올려보세요!
+              선택한 월에는 저장된 내역이 없어요.<br />다른 월을 선택하거나 새 내역을 추가해보세요!
             </div>
           ) : (
             <ul className="rounded-2xl bg-card border divide-y overflow-hidden">
-              {expenses.map((e) => {
+              {monthExpenses.map((e) => {
                 const d = new Date(e.spent_at);
                 const dateStr = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
                 const color = CATEGORY_COLORS[e.category] ?? CATEGORY_COLORS["기타"];

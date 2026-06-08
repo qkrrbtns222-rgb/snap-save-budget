@@ -474,10 +474,21 @@ function Index() {
     const total = monthExpenses.reduce((s, e) => s + Number(e.amount), 0);
     const byCat = new Map<string, number>();
     monthExpenses.forEach((e) => byCat.set(e.category, (byCat.get(e.category) ?? 0) + Number(e.amount)));
+    const byDay = new Map<number, number>();
+    monthExpenses.forEach((e) => {
+      const d = new Date(e.spent_at);
+      byDay.set(d.getDate(), (byDay.get(d.getDate()) ?? 0) + Number(e.amount));
+    });
+    const dayEntries = Array.from(byDay.entries()).sort((a, b) => a[0] - b[0]);
     const lines = [`📊 ${ym} 가계부`, `💰 총지출: ${won(total)} (${monthExpenses.length}건)`, ""];
     if (byCat.size > 0) {
       lines.push("📂 카테고리별");
       [...byCat.entries()].sort((a, b) => b[1] - a[1]).forEach(([c, v]) => lines.push(`  • ${c}: ${won(v)}`));
+      lines.push("");
+    }
+    if (dayEntries.length > 0) {
+      lines.push("📅 일별 총계");
+      dayEntries.forEach(([day, v]) => lines.push(`  ${selM + 1}/${day}: ${won(v)}`));
       lines.push("");
     }
     lines.push("📝 상세 내역");

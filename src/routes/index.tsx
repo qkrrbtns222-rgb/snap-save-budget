@@ -163,6 +163,12 @@ function Index() {
     return Array.from(set).sort((a, b) => b.localeCompare(a));
   }, [expenses, currentYM]);
 
+  useEffect(() => {
+    if (!availableMonths.includes(selectedYM)) {
+      setSelectedYM(availableMonths[0] ?? currentYM);
+    }
+  }, [availableMonths, selectedYM, currentYM]);
+
   const [selY, selM] = useMemo(() => {
     const [y, m] = selectedYM.split("-").map(Number);
     return [y, m - 1];
@@ -170,32 +176,30 @@ function Index() {
 
   const monthLabel = useMemo(() => `${selY}년 ${selM + 1}월`, [selY, selM]);
 
-  const monthTotal = useMemo(() => {
-    return expenses
-      .filter((e) => {
-        const d = new Date(e.spent_at);
-        return d.getFullYear() === selY && d.getMonth() === selM;
-      })
-      .reduce((sum, e) => sum + Number(e.amount), 0);
+  const monthExpenses = useMemo(() => {
+    return expenses.filter((e) => {
+      const d = new Date(e.spent_at);
+      return d.getFullYear() === selY && d.getMonth() === selM;
+    });
   }, [expenses, selY, selM]);
+
+  const monthTotal = useMemo(() => {
+    return monthExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
+  }, [monthExpenses]);
 
   const monthByAsset = useMemo(() => {
     const map = new Map<string, number>();
-    for (const e of expenses) {
-      const d = new Date(e.spent_at);
-      if (d.getFullYear() !== selY || d.getMonth() !== selM) continue;
+    for (const e of monthExpenses) {
       const key = e.asset || "기타";
       map.set(key, (map.get(key) ?? 0) + Number(e.amount));
     }
     return Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
-  }, [expenses, selY, selM]);
+  }, [monthExpenses]);
 
   const monthByCategory = useMemo(() => {
     const map = new Map<string, number>();
     for (const c of CATEGORIES) map.set(c, 0);
-    for (const e of expenses) {
-      const d = new Date(e.spent_at);
-      if (d.getFullYear() !== selY || d.getMonth() !== selM) continue;
+    for (const e of monthExpenses) {
       const key = (CATEGORIES as readonly string[]).includes(e.category) ? e.category : "기타";
       map.set(key, (map.get(key) ?? 0) + Number(e.amount));
     }
@@ -203,7 +207,7 @@ function Index() {
       .filter(([, v]) => v > 0)
       .map(([category, total]) => ({ category, total }))
       .sort((a, b) => b.total - a.total);
-  }, [expenses, selY, selM]);
+  }, [monthExpenses]);
 
   const dailySeries = useMemo(() => {
     const days = new Date(selY, selM + 1, 0).getDate();
@@ -212,23 +216,21 @@ function Index() {
       label: `${i + 1}`,
       total: 0,
     }));
-    for (const e of expenses) {
+    for (const e of monthExpenses) {
       const d = new Date(e.spent_at);
-      if (d.getFullYear() !== selY || d.getMonth() !== selM) continue;
       arr[d.getDate() - 1].total += Number(e.amount);
     }
     return arr;
-  }, [expenses, selY, selM]);
+  }, [monthExpenses, selY, selM]);
 
   const dailyTotals = useMemo(() => {
     const map = new Map<number, number>();
-    for (const e of expenses) {
+    for (const e of monthExpenses) {
       const d = new Date(e.spent_at);
-      if (d.getFullYear() !== selY || d.getMonth() !== selM) continue;
       map.set(d.getDate(), (map.get(d.getDate()) ?? 0) + Number(e.amount));
     }
     return Array.from(map.entries()).sort((a, b) => a[0] - b[0]);
-  }, [expenses, selY, selM]);
+  }, [monthExpenses]);
 
   const PIE_COLORS = [
     "hsl(220 90% 56%)",

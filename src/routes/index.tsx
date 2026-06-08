@@ -575,13 +575,13 @@ function Index() {
 
         {/* Month selector */}
         <section className="rounded-2xl border bg-card p-4 shadow-sm">
-          <div className="flex items-center justify-between gap-3">
+          <div className="space-y-3">
             <div>
               <p className="text-sm font-semibold">조회 월</p>
-              <p className="text-xs text-muted-foreground">보고 싶은 달만 골라서 요약과 복사 내용을 바꿔볼 수 있어요</p>
+              <p className="mt-1 text-xs text-muted-foreground">선택한 달 기준으로 차트, 일별 총계, 복사 내용이 바뀝니다</p>
             </div>
             <Select value={selectedYM} onValueChange={setSelectedYM}>
-              <SelectTrigger className="h-10 min-w-36 text-sm shrink-0">
+              <SelectTrigger className="h-10 w-full text-sm">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

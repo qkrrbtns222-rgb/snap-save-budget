@@ -220,6 +220,16 @@ function Index() {
     return arr;
   }, [expenses, selY, selM]);
 
+  const dailyTotals = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const e of expenses) {
+      const d = new Date(e.spent_at);
+      if (d.getFullYear() !== selY || d.getMonth() !== selM) continue;
+      map.set(d.getDate(), (map.get(d.getDate()) ?? 0) + Number(e.amount));
+    }
+    return Array.from(map.entries()).sort((a, b) => a[0] - b[0]);
+  }, [expenses, selY, selM]);
+
   const PIE_COLORS = [
     "hsl(220 90% 56%)",
     "hsl(25 95% 60%)",
@@ -464,10 +474,21 @@ function Index() {
     const total = monthExpenses.reduce((s, e) => s + Number(e.amount), 0);
     const byCat = new Map<string, number>();
     monthExpenses.forEach((e) => byCat.set(e.category, (byCat.get(e.category) ?? 0) + Number(e.amount)));
+    const byDay = new Map<number, number>();
+    monthExpenses.forEach((e) => {
+      const d = new Date(e.spent_at);
+      byDay.set(d.getDate(), (byDay.get(d.getDate()) ?? 0) + Number(e.amount));
+    });
+    const dayEntries = Array.from(byDay.entries()).sort((a, b) => a[0] - b[0]);
     const lines = [`📊 ${ym} 가계부`, `💰 총지출: ${won(total)} (${monthExpenses.length}건)`, ""];
     if (byCat.size > 0) {
       lines.push("📂 카테고리별");
       [...byCat.entries()].sort((a, b) => b[1] - a[1]).forEach(([c, v]) => lines.push(`  • ${c}: ${won(v)}`));
+      lines.push("");
+    }
+    if (dayEntries.length > 0) {
+      lines.push("📅 일별 총계");
+      dayEntries.forEach(([day, v]) => lines.push(`  ${selM + 1}/${day}: ${won(v)}`));
       lines.push("");
     }
     lines.push("📝 상세 내역");
@@ -672,6 +693,23 @@ function Index() {
               {monthByAsset.map(([asset, sum]) => (
                 <li key={asset} className="flex items-center justify-between py-2 px-1">
                   <span className="text-sm">{asset}</span>
+                  <span className="text-sm font-semibold tabular-nums">{won(sum)}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {/* Daily totals */}
+        {dailyTotals.length > 0 && (
+          <section className="rounded-2xl border bg-card p-4 shadow-sm">
+            <div className="flex items-baseline justify-between mb-2 px-1">
+              <h2 className="text-sm font-semibold">{monthLabel} 일별 총계</h2>
+            </div>
+            <ul className="divide-y">
+              {dailyTotals.map(([day, sum]) => (
+                <li key={day} className="flex items-center justify-between py-2 px-1">
+                  <span className="text-sm">{day}일</span>
                   <span className="text-sm font-semibold tabular-nums">{won(sum)}</span>
                 </li>
               ))}

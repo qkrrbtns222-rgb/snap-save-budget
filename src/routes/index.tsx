@@ -700,6 +700,23 @@ function Index() {
           </section>
         )}
 
+        {/* Daily totals */}
+        {dailyTotals.length > 0 && (
+          <section className="rounded-2xl border bg-card p-4 shadow-sm">
+            <div className="flex items-baseline justify-between mb-2 px-1">
+              <h2 className="text-sm font-semibold">{monthLabel} 일별 총계</h2>
+            </div>
+            <ul className="divide-y">
+              {dailyTotals.map(([day, sum]) => (
+                <li key={day} className="flex items-center justify-between py-2 px-1">
+                  <span className="text-sm">{day}일</span>
+                  <span className="text-sm font-semibold tabular-nums">{won(sum)}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
         {/* Quick add */}
         <section className="rounded-2xl bg-card border p-4 shadow-sm">
           <div className="flex items-center gap-1.5 mb-2 px-1">

@@ -163,6 +163,12 @@ function Index() {
     return Array.from(set).sort((a, b) => b.localeCompare(a));
   }, [expenses, currentYM]);
 
+  useEffect(() => {
+    if (!availableMonths.includes(selectedYM)) {
+      setSelectedYM(availableMonths[0] ?? currentYM);
+    }
+  }, [availableMonths, selectedYM, currentYM]);
+
   const [selY, selM] = useMemo(() => {
     const [y, m] = selectedYM.split("-").map(Number);
     return [y, m - 1];
@@ -170,32 +176,30 @@ function Index() {
 
   const monthLabel = useMemo(() => `${selY}년 ${selM + 1}월`, [selY, selM]);
 
-  const monthTotal = useMemo(() => {
-    return expenses
-      .filter((e) => {
-        const d = new Date(e.spent_at);
-        return d.getFullYear() === selY && d.getMonth() === selM;
-      })
-      .reduce((sum, e) => sum + Number(e.amount), 0);
+  const monthExpenses = useMemo(() => {
+    return expenses.filter((e) => {
+      const d = new Date(e.spent_at);
+      return d.getFullYear() === selY && d.getMonth() === selM;
+    });
   }, [expenses, selY, selM]);
+
+  const monthTotal = useMemo(() => {
+    return monthExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
+  }, [monthExpenses]);
 
   const monthByAsset = useMemo(() => {
     const map = new Map<string, number>();
-    for (const e of expenses) {
-      const d = new Date(e.spent_at);
-      if (d.getFullYear() !== selY || d.getMonth() !== selM) continue;
+    for (const e of monthExpenses) {
       const key = e.asset || "기타";
       map.set(key, (map.get(key) ?? 0) + Number(e.amount));
     }
     return Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
-  }, [expenses, selY, selM]);
+  }, [monthExpenses]);
 
   const monthByCategory = useMemo(() => {
     const map = new Map<string, number>();
     for (const c of CATEGORIES) map.set(c, 0);
-    for (const e of expenses) {
-      const d = new Date(e.spent_at);
-      if (d.getFullYear() !== selY || d.getMonth() !== selM) continue;
+    for (const e of monthExpenses) {
       const key = (CATEGORIES as readonly string[]).includes(e.category) ? e.category : "기타";
       map.set(key, (map.get(key) ?? 0) + Number(e.amount));
     }
@@ -203,7 +207,7 @@ function Index() {
       .filter(([, v]) => v > 0)
       .map(([category, total]) => ({ category, total }))
       .sort((a, b) => b.total - a.total);
-  }, [expenses, selY, selM]);
+  }, [monthExpenses]);
 
   const dailySeries = useMemo(() => {
     const days = new Date(selY, selM + 1, 0).getDate();
@@ -212,23 +216,21 @@ function Index() {
       label: `${i + 1}`,
       total: 0,
     }));
-    for (const e of expenses) {
+    for (const e of monthExpenses) {
       const d = new Date(e.spent_at);
-      if (d.getFullYear() !== selY || d.getMonth() !== selM) continue;
       arr[d.getDate() - 1].total += Number(e.amount);
     }
     return arr;
-  }, [expenses, selY, selM]);
+  }, [monthExpenses, selY, selM]);
 
   const dailyTotals = useMemo(() => {
     const map = new Map<number, number>();
-    for (const e of expenses) {
+    for (const e of monthExpenses) {
       const d = new Date(e.spent_at);
-      if (d.getFullYear() !== selY || d.getMonth() !== selM) continue;
       map.set(d.getDate(), (map.get(d.getDate()) ?? 0) + Number(e.amount));
     }
     return Array.from(map.entries()).sort((a, b) => a[0] - b[0]);
-  }, [expenses, selY, selM]);
+  }, [monthExpenses]);
 
   const PIE_COLORS = [
     "hsl(220 90% 56%)",
@@ -466,10 +468,6 @@ function Index() {
 
   const buildExportText = () => {
     const ym = `${selY}년 ${selM + 1}월`;
-    const monthExpenses = expenses.filter((e) => {
-      const d = new Date(e.spent_at);
-      return d.getFullYear() === selY && d.getMonth() === selM;
-    });
     if (monthExpenses.length === 0) return "";
     const total = monthExpenses.reduce((s, e) => s + Number(e.amount), 0);
     const byCat = new Map<string, number>();
@@ -576,24 +574,29 @@ function Index() {
         </section>
 
         {/* Month selector */}
-        <div className="flex items-center gap-2 px-1">
-          <Label className="text-xs text-muted-foreground">조회 월</Label>
-          <Select value={selectedYM} onValueChange={setSelectedYM}>
-            <SelectTrigger className="h-8 w-auto min-w-32 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {availableMonths.map((ym) => {
-                const [y, m] = ym.split("-");
-                return (
-                  <SelectItem key={ym} value={ym}>
-                    {y}년 {Number(m)}월
-                  </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
-        </div>
+        <section className="rounded-2xl border bg-card p-4 shadow-sm">
+          <div className="space-y-3">
+            <div>
+              <p className="text-sm font-semibold">조회 월</p>
+              <p className="mt-1 text-xs text-muted-foreground">선택한 달 기준으로 차트, 일별 총계, 복사 내용이 바뀝니다</p>
+            </div>
+            <Select value={selectedYM} onValueChange={setSelectedYM}>
+              <SelectTrigger className="h-10 w-full text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {availableMonths.map((ym) => {
+                  const [y, m] = ym.split("-");
+                  return (
+                    <SelectItem key={ym} value={ym}>
+                      {y}년 {Number(m)}월
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          </div>
+        </section>
 
         {/* Charts */}
         <section className="rounded-2xl border bg-card p-4 shadow-sm">
@@ -961,7 +964,7 @@ function Index() {
         <section>
           <div className="flex items-center justify-between mb-3 px-1">
             <h2 className="font-semibold">
-              최근 내역 <span className="text-xs text-muted-foreground font-normal">({expenses.length}건)</span>
+              최근 내역 <span className="text-xs text-muted-foreground font-normal">({monthExpenses.length}건)</span>
             </h2>
             {expenses.length > 0 && (
               <AlertDialog>
@@ -990,20 +993,20 @@ function Index() {
               </AlertDialog>
             )}
           </div>
-          {expenses.length > 0 && (
+          {monthExpenses.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 mb-3 px-1">
               <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" onClick={copyExportText}>
                 <Copy className="size-3.5" /> {monthLabel} 텍스트 복사
               </Button>
             </div>
           )}
-          {expenses.length === 0 ? (
+          {monthExpenses.length === 0 ? (
             <div className="rounded-2xl border bg-card p-10 text-center text-sm text-muted-foreground">
-              아직 저장된 내역이 없어요.<br />첫 스크린샷을 올려보세요!
+              선택한 월에는 저장된 내역이 없어요.<br />다른 월을 선택하거나 새 내역을 추가해보세요!
             </div>
           ) : (
             <ul className="rounded-2xl bg-card border divide-y overflow-hidden">
-              {expenses.map((e) => {
+              {monthExpenses.map((e) => {
                 const d = new Date(e.spent_at);
                 const dateStr = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
                 const color = CATEGORY_COLORS[e.category] ?? CATEGORY_COLORS["기타"];

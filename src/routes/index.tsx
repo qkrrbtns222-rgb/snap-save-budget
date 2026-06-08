@@ -220,6 +220,16 @@ function Index() {
     return arr;
   }, [expenses, selY, selM]);
 
+  const dailyTotals = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const e of expenses) {
+      const d = new Date(e.spent_at);
+      if (d.getFullYear() !== selY || d.getMonth() !== selM) continue;
+      map.set(d.getDate(), (map.get(d.getDate()) ?? 0) + Number(e.amount));
+    }
+    return Array.from(map.entries()).sort((a, b) => a[0] - b[0]);
+  }, [expenses, selY, selM]);
+
   const PIE_COLORS = [
     "hsl(220 90% 56%)",
     "hsl(25 95% 60%)",

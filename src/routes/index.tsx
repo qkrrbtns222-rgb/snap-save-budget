@@ -810,7 +810,7 @@ function Index() {
                   </div>
                   <p className="font-semibold">결제 스크린샷 업로드</p>
                   <p className="text-xs text-muted-foreground">
-                    문자, 은행앱, 영수증 사진을 여기에 놓거나 탭하세요
+                    문자·은행앱·영수증 사진을 여러 장 한번에 올릴 수 있어요
                   </p>
                 </div>
               )}

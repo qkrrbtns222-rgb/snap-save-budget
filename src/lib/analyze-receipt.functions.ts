@@ -15,11 +15,16 @@ export const analyzeReceipt = createServerFn({ method: "POST" })
 
     const today = new Date();
     const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+    const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, "0")}-${String(yesterday.getDate()).padStart(2, "0")}`;
+    const dayBefore = new Date(today.getTime() - 2 * 24 * 60 * 60 * 1000);
+    const dayBeforeStr = `${dayBefore.getFullYear()}-${String(dayBefore.getMonth() + 1).padStart(2, "0")}-${String(dayBefore.getDate()).padStart(2, "0")}`;
     const systemPrompt = `당신은 한국 결제 영수증/문자/은행앱 스크린샷을 분석하는 전문가입니다.
 오늘 날짜는 ${todayStr} 입니다. 이미지에 연도가 표시되지 않은 경우 반드시 올해(${today.getFullYear()})를 사용하세요. 미래 날짜가 되면 작년을 사용하세요.
+**상대 날짜 처리 (매우 중요):** 이미지에 "오늘"이라고 표시되면 ${todayStr}, "어제"는 ${yesterdayStr}, "그제/그저께"는 ${dayBeforeStr}로 반드시 절대 날짜로 변환하세요. 현대카드 등 앱은 "어제"라는 라벨을 자주 사용하는데, 이 경우 반드시 ${yesterdayStr}로 기록해야 합니다. 절대 오늘 날짜로 기록하지 마세요.
 이미지에 **여러 건의 결제 내역**이 포함될 수 있습니다 (예: 거래내역 목록, 여러 영수증을 한 장에 모은 사진 등).
 각 결제 건마다 다음 정보를 추출해 배열로 반환하세요:
-- 결제일시 (날짜와 시간, ISO 8601 형식). 날짜 정보가 전혀 없으면 오늘(${todayStr})을 사용하세요.
+- 결제일시 (날짜와 시간, ISO 8601 형식). 날짜 정보가 전혀 없으면 오늘(${todayStr})을 사용하세요. "어제"는 ${yesterdayStr}로, "그제"는 ${dayBeforeStr}로 변환합니다.
 - 가맹점/사용처 (브랜드명만 간결하게)
 - 결제 금액 (쉼표, '원' 제거한 순수 정수, 양수)
 - 카테고리 (다음 중 하나: ${CATEGORIES.join(", ")})

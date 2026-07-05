@@ -948,10 +948,11 @@ function Index() {
               <input
                 type="file"
                 accept="image/*"
+                multiple
                 className="sr-only"
                 onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) handleFile(f);
+                  const fs = Array.from(e.target.files ?? []);
+                  if (fs.length > 0) handleFiles(fs);
                   e.target.value = "";
                 }}
                 disabled={analyzing}

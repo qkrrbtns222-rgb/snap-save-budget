@@ -343,64 +343,82 @@ function Index() {
     toast.success("내역이 추가되었어요");
   }, [quickText, parseQuickText]);
 
-  const handleFile = useCallback(
-    async (file: File) => {
+  const analyzeOne = useCallback(
+    async (file: File, showPreview: boolean): Promise<number> => {
       if (!file.type.startsWith("image/")) {
-        toast.error("이미지 파일만 업로드할 수 있어요");
-        return;
+        toast.error(`${file.name}: 이미지 파일만 가능해요`);
+        return 0;
       }
       if (file.size > 8 * 1024 * 1024) {
-        toast.error("8MB 이하 이미지만 가능해요");
-        return;
+        toast.error(`${file.name}: 8MB 이하만 가능해요`);
+        return 0;
       }
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const dataUrl = reader.result as string;
-        setPreview(dataUrl);
-        setAnalyzing(true);
-        try {
-          const result = await analyze({ data: { imageDataUrl: dataUrl } });
-          const items = result.expenses ?? [];
-          if (items.length === 0) {
-            toast.error("결제 내역을 찾지 못했어요. 다른 사진을 올려보세요.");
-            setPreview(null);
-            return;
-          }
-          const newDrafts: Draft[] = items.map((it) => ({
-            id: makeDraftId(),
-            spent_at: toLocalInput(it.spent_at),
-            merchant: it.merchant,
-            amount: String(it.amount),
-            category: (CATEGORIES as readonly string[]).includes(it.category)
-              ? (it.category as Category)
-              : "기타",
-            asset: (it.asset ?? "").trim() || "기타",
-            memo: "",
-          }));
-
-          setDraftList((prev) => [...prev, ...newDrafts]);
-          toast.success(`${newDrafts.length}건 분석 완료! 내용을 확인하고 저장해주세요`);
-        } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : "분석에 실패했습니다";
-          toast.error(msg);
-          setPreview(null);
-        } finally {
-          setAnalyzing(false);
-        }
-      };
-      reader.readAsDataURL(file);
+      const dataUrl: string = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error("파일을 읽지 못했어요"));
+        reader.readAsDataURL(file);
+      });
+      if (showPreview) setPreview(dataUrl);
+      try {
+        const result = await analyze({ data: { imageDataUrl: dataUrl } });
+        const items = result.expenses ?? [];
+        if (items.length === 0) return 0;
+        const newDrafts: Draft[] = items.map((it) => ({
+          id: makeDraftId(),
+          spent_at: toLocalInput(it.spent_at),
+          merchant: it.merchant,
+          amount: String(it.amount),
+          category: (CATEGORIES as readonly string[]).includes(it.category)
+            ? (it.category as Category)
+            : "기타",
+          asset: (it.asset ?? "").trim() || "기타",
+          memo: "",
+        }));
+        setDraftList((prev) => [...prev, ...newDrafts]);
+        return newDrafts.length;
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "분석 실패";
+        toast.error(`${file.name}: ${msg}`);
+        return 0;
+      }
     },
     [analyze],
+  );
+
+  const handleFiles = useCallback(
+    async (files: File[]) => {
+      if (files.length === 0) return;
+      setAnalyzing(true);
+      let total = 0;
+      let processed = 0;
+      for (const f of files) {
+        processed += 1;
+        if (files.length > 1) {
+          toast.message(`분석 중 ${processed}/${files.length}: ${f.name}`);
+        }
+        const added = await analyzeOne(f, processed === 1);
+        total += added;
+      }
+      setAnalyzing(false);
+      if (total === 0) {
+        toast.error("결제 내역을 찾지 못했어요");
+        setPreview(null);
+      } else {
+        toast.success(`총 ${total}건 분석 완료! 확인 후 저장해주세요`);
+      }
+    },
+    [analyzeOne],
   );
 
   const onDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
       setDragOver(false);
-      const file = e.dataTransfer.files?.[0];
-      if (file) handleFile(file);
+      const files = Array.from(e.dataTransfer.files ?? []);
+      if (files.length > 0) handleFiles(files);
     },
-    [handleFile],
+    [handleFiles],
   );
 
   const updateDraft = (id: string, patch: Partial<Draft>) =>

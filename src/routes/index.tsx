@@ -390,22 +390,20 @@ function Index() {
     async (files: File[]) => {
       if (files.length === 0) return;
       setAnalyzing(true);
-      let total = 0;
-      let processed = 0;
-      for (const f of files) {
-        processed += 1;
-        if (files.length > 1) {
-          toast.message(`분석 중 ${processed}/${files.length}: ${f.name}`);
+      try {
+        // 첫 장은 프리뷰 표시, 나머지는 병렬 분석
+        const results = await Promise.all(
+          files.map((f, i) => analyzeOne(f, i === 0)),
+        );
+        const total = results.reduce((a, b) => a + b, 0);
+        if (total === 0) {
+          toast.error("결제 내역을 찾지 못했어요");
+          setPreview(null);
+        } else {
+          toast.success(`${files.length}장에서 총 ${total}건 분석 완료!`);
         }
-        const added = await analyzeOne(f, processed === 1);
-        total += added;
-      }
-      setAnalyzing(false);
-      if (total === 0) {
-        toast.error("결제 내역을 찾지 못했어요");
-        setPreview(null);
-      } else {
-        toast.success(`총 ${total}건 분석 완료! 확인 후 저장해주세요`);
+      } finally {
+        setAnalyzing(false);
       }
     },
     [analyzeOne],

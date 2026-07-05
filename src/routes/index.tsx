@@ -121,6 +121,62 @@ function toLocalInput(iso: string) {
 
 const won = (n: number) => `${n.toLocaleString("ko-KR")}원`;
 
+const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
+const MAX_AI_DATA_URL_LENGTH = 14_000_000;
+const MAX_IMAGE_SIDE = 1800;
+
+const readAsDataUrl = (file: File) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("파일을 읽지 못했어요"));
+    reader.readAsDataURL(file);
+  });
+
+const loadImage = (src: string) =>
+  new Promise<HTMLImageElement>((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("이미지를 열지 못했어요"));
+    img.src = src;
+  });
+
+async function prepareImageForAnalysis(file: File) {
+  if (!file.type.startsWith("image/")) {
+    throw new Error("이미지 파일만 가능해요");
+  }
+  if (file.size > MAX_UPLOAD_BYTES) {
+    throw new Error("20MB 이하 이미지만 가능해요");
+  }
+
+  const originalDataUrl = await readAsDataUrl(file);
+  if (originalDataUrl.length <= MAX_AI_DATA_URL_LENGTH && file.size <= 6 * 1024 * 1024) {
+    return originalDataUrl;
+  }
+
+  try {
+    const img = await loadImage(originalDataUrl);
+    const scale = Math.min(1, MAX_IMAGE_SIDE / Math.max(img.naturalWidth, img.naturalHeight));
+    const width = Math.max(1, Math.round(img.naturalWidth * scale));
+    const height = Math.max(1, Math.round(img.naturalHeight * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("이미지 변환을 준비하지 못했어요");
+    ctx.drawImage(img, 0, 0, width, height);
+
+    for (const quality of [0.88, 0.78, 0.68, 0.58]) {
+      const compressed = canvas.toDataURL("image/jpeg", quality);
+      if (compressed.length <= MAX_AI_DATA_URL_LENGTH) return compressed;
+    }
+  } catch {
+    if (originalDataUrl.length <= MAX_AI_DATA_URL_LENGTH) return originalDataUrl;
+  }
+
+  throw new Error("이미지가 너무 커서 분석용으로 줄이지 못했어요. 스크린샷을 조금 작게 잘라서 올려주세요");
+}
+
 function Index() {
   const analyze = useServerFn(analyzeReceipt);
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -130,6 +186,7 @@ function Index() {
   const [preview, setPreview] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [quickText, setQuickText] = useState("");
+  const [analysisStatus, setAnalysisStatus] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadExpenses = useCallback(async () => {
@@ -344,22 +401,13 @@ function Index() {
   }, [quickText, parseQuickText]);
 
   const analyzeOne = useCallback(
-    async (file: File, showPreview: boolean): Promise<number> => {
-      if (!file.type.startsWith("image/")) {
-        toast.error(`${file.name}: 이미지 파일만 가능해요`);
-        return 0;
-      }
-      if (file.size > 8 * 1024 * 1024) {
-        toast.error(`${file.name}: 8MB 이하만 가능해요`);
-        return 0;
-      }
-      const dataUrl: string = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = () => reject(new Error("파일을 읽지 못했어요"));
-        reader.readAsDataURL(file);
-      });
-      if (showPreview) setPreview(dataUrl);
+    async (file: File, showPreview: boolean, index: number, totalFiles: number): Promise<number> => {
+      setAnalysisStatus(`${index + 1}/${totalFiles}장 준비 중...`);
+      const previewDataUrl = showPreview ? await readAsDataUrl(file) : null;
+      if (previewDataUrl) setPreview(previewDataUrl);
+
+      setAnalysisStatus(`${index + 1}/${totalFiles}장 분석 중...`);
+      const dataUrl = await prepareImageForAnalysis(file);
       try {
         const result = await analyze({ data: { imageDataUrl: dataUrl } });
         const items = result.expenses ?? [];
@@ -389,21 +437,37 @@ function Index() {
   const handleFiles = useCallback(
     async (files: File[]) => {
       if (files.length === 0) return;
+      const imageFiles = files.filter((file) => file.type.startsWith("image/"));
+      if (imageFiles.length === 0) {
+        toast.error("이미지 파일만 올릴 수 있어요");
+        return;
+      }
+      if (imageFiles.length !== files.length) {
+        toast.error("이미지가 아닌 파일은 제외했어요");
+      }
       setAnalyzing(true);
+      setAnalysisStatus("업로드 준비 중...");
       try {
-        // 첫 장은 프리뷰 표시, 나머지는 병렬 분석
-        const results = await Promise.all(
-          files.map((f, i) => analyzeOne(f, i === 0)),
-        );
+        const results: number[] = [];
+        for (let i = 0; i < imageFiles.length; i += 1) {
+          try {
+            results.push(await analyzeOne(imageFiles[i], i === 0, i, imageFiles.length));
+          } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : "분석 실패";
+            toast.error(`${imageFiles[i].name}: ${msg}`);
+            results.push(0);
+          }
+        }
         const total = results.reduce((a, b) => a + b, 0);
         if (total === 0) {
           toast.error("결제 내역을 찾지 못했어요");
           setPreview(null);
         } else {
-          toast.success(`${files.length}장에서 총 ${total}건 분석 완료!`);
+          toast.success(`${imageFiles.length}장에서 총 ${total}건 분석 완료!`);
         }
       } finally {
         setAnalyzing(false);
+        setAnalysisStatus("");
       }
     },
     [analyzeOne],
@@ -799,7 +863,7 @@ function Index() {
                     <Sparkles className="size-4 text-primary absolute -top-1 -right-1 animate-pulse" />
                   </div>
                   <p className="font-medium">AI가 내역을 분석 중입니다...</p>
-                  <p className="text-xs text-muted-foreground">잠시만 기다려주세요</p>
+                  <p className="text-xs text-muted-foreground">{analysisStatus || "잠시만 기다려주세요"}</p>
                 </div>
               ) : (
                 <div className="flex flex-col items-center gap-2">

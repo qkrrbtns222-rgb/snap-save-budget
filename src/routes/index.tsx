@@ -544,14 +544,49 @@ function Index() {
     }
   };
 
-  const resetAllExpenses = async () => {
-    const { error } = await supabase.from("expenses").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-    if (error) toast.error("초기화 실패: " + error.message);
-    else {
-      toast.success("모든 내역이 초기화되었습니다");
-      loadExpenses();
-    }
+  const [editing, setEditing] = useState<Draft | null>(null);
+
+  const openEdit = (e: Expense) => {
+    setEditing({
+      id: e.id,
+      spent_at: toLocalInput(e.spent_at),
+      merchant: e.merchant,
+      amount: String(e.amount),
+      category: (CATEGORIES as readonly string[]).includes(e.category)
+        ? (e.category as Category)
+        : "기타",
+      asset: e.asset || "기타",
+      memo: e.memo ?? "",
+    });
   };
+
+  const saveEdit = async () => {
+    if (!editing) return;
+    const amountNum = Number(editing.amount.replace(/[^\d.]/g, ""));
+    if (!editing.merchant.trim() || !amountNum || !editing.spent_at) {
+      toast.error("사용처, 금액, 날짜를 모두 입력해주세요");
+      return;
+    }
+    const { error } = await supabase
+      .from("expenses")
+      .update({
+        spent_at: new Date(editing.spent_at).toISOString(),
+        merchant: editing.merchant.trim(),
+        amount: amountNum,
+        category: editing.category,
+        asset: editing.asset.trim() || "기타",
+        memo: editing.memo.trim() || null,
+      })
+      .eq("id", editing.id);
+    if (error) {
+      toast.error("수정 실패: " + error.message);
+      return;
+    }
+    toast.success("수정되었습니다");
+    setEditing(null);
+    loadExpenses();
+  };
+
 
   const buildExportText = () => {
     const ym = `${selY}년 ${selM + 1}월`;

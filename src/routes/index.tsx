@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Toaster, toast } from "sonner";
-import { Upload, Loader2, Trash2, Sparkles, Wallet, X, Plus, BarChart3, RotateCcw, Copy } from "lucide-react";
+import { Upload, Loader2, Trash2, Sparkles, Wallet, X, Plus, BarChart3, Copy, Pencil } from "lucide-react";
 import {
   BarChart,
   Bar,

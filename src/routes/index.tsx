@@ -1091,32 +1091,6 @@ function Index() {
             <h2 className="font-semibold">
               최근 내역 <span className="text-xs text-muted-foreground font-normal">({monthExpenses.length}건)</span>
             </h2>
-            {expenses.length > 0 && (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground hover:text-destructive">
-                    <RotateCcw className="size-3.5" /> 전체 초기화
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>모든 지출 내역을 삭제할까요?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      저장된 {expenses.length}건의 내역이 모두 삭제됩니다. 이 작업은 되돌릴 수 없어요.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>취소</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={resetAllExpenses}
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    >
-                      전체 삭제
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            )}
           </div>
           {monthExpenses.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 mb-3 px-1">
@@ -1136,7 +1110,7 @@ function Index() {
                 const dateStr = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
                 const color = CATEGORY_COLORS[e.category] ?? CATEGORY_COLORS["기타"];
                 return (
-                  <li key={e.id} className="group flex items-center gap-3 p-4">
+                  <li key={e.id} className="flex items-center gap-3 p-4">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${color}`}>
@@ -1156,19 +1130,142 @@ function Index() {
                       )}
                     </div>
 
-                    <button
-                      onClick={() => deleteExpense(e.id)}
-                      className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition p-1"
-                      aria-label="삭제"
-                    >
-                      <Trash2 className="size-4" />
-                    </button>
+                    <div className="flex items-center gap-0.5">
+                      <button
+                        onClick={() => openEdit(e)}
+                        className="text-muted-foreground hover:text-primary transition p-1.5"
+                        aria-label="수정"
+                      >
+                        <Pencil className="size-4" />
+                      </button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <button
+                            className="text-muted-foreground hover:text-destructive transition p-1.5"
+                            aria-label="삭제"
+                          >
+                            <Trash2 className="size-4" />
+                          </button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>이 내역을 삭제할까요?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              {e.merchant} · {won(Number(e.amount))}
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>취소</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => deleteExpense(e.id)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              삭제
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
                   </li>
                 );
               })}
             </ul>
           )}
         </section>
+
+        {/* Edit dialog */}
+        <Dialog open={!!editing} onOpenChange={(open) => !open && setEditing(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>내역 수정</DialogTitle>
+            </DialogHeader>
+            {editing && (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2">
+                  <Label className="text-xs">사용처</Label>
+                  <Input
+                    value={editing.merchant}
+                    onChange={(ev) => setEditing({ ...editing, merchant: ev.target.value })}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">금액 (원)</Label>
+                  <Input
+                    inputMode="numeric"
+                    value={editing.amount}
+                    onChange={(ev) => setEditing({ ...editing, amount: ev.target.value })}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">카테고리</Label>
+                  <Select
+                    value={editing.category}
+                    onValueChange={(v) => setEditing({ ...editing, category: v as Category })}
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CATEGORIES.map((c) => (
+                        <SelectItem key={c} value={c}>{c}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="col-span-2">
+                  <Label className="text-xs">결제 수단</Label>
+                  <Select
+                    value={ASSETS.includes(editing.asset as Asset) ? editing.asset : "__custom__"}
+                    onValueChange={(v) =>
+                      setEditing({ ...editing, asset: v === "__custom__" ? "" : v })
+                    }
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="결제 수단 선택" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ASSETS.map((a) => (
+                        <SelectItem key={a} value={a}>{a}</SelectItem>
+                      ))}
+                      <SelectItem value="__custom__">직접 입력</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {!ASSETS.includes(editing.asset as Asset) && (
+                    <Input
+                      value={editing.asset}
+                      onChange={(ev) => setEditing({ ...editing, asset: ev.target.value })}
+                      placeholder="예: 신한카드"
+                      className="mt-2"
+                    />
+                  )}
+                </div>
+                <div className="col-span-2">
+                  <Label className="text-xs">결제일시</Label>
+                  <Input
+                    type="datetime-local"
+                    value={editing.spent_at}
+                    onChange={(ev) => setEditing({ ...editing, spent_at: ev.target.value })}
+                    className="mt-1"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <Label className="text-xs">메모 (선택)</Label>
+                  <Input
+                    value={editing.memo}
+                    onChange={(ev) => setEditing({ ...editing, memo: ev.target.value })}
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditing(null)}>취소</Button>
+              <Button onClick={saveEdit}>저장</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );

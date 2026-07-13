@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Toaster, toast } from "sonner";
-import { Upload, Loader2, Trash2, Sparkles, Wallet, X, Plus, BarChart3, Copy, Pencil } from "lucide-react";
+import { Upload, Loader2, Trash2, Sparkles, Wallet, X, Plus, BarChart3, Copy, Pencil, RotateCcw } from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -540,6 +540,15 @@ function Index() {
     if (error) toast.error("삭제 실패");
     else {
       toast.success("삭제되었습니다");
+      loadExpenses();
+    }
+  };
+
+  const resetAllExpenses = async () => {
+    const { error } = await supabase.from("expenses").delete().not("id", "is", null);
+    if (error) toast.error("초기화 실패: " + error.message);
+    else {
+      toast.success("전체 내역을 초기화했어요");
       loadExpenses();
     }
   };
@@ -1097,6 +1106,30 @@ function Index() {
               <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" onClick={copyExportText}>
                 <Copy className="size-3.5" /> {monthLabel} 텍스트 복사
               </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5 text-destructive hover:text-destructive">
+                    <RotateCcw className="size-3.5" /> 전체 초기화
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>모든 내역을 삭제할까요?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      저장된 모든 지출 내역이 영구적으로 삭제됩니다. 이 작업은 되돌릴 수 없어요.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>취소</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={resetAllExpenses}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      전체 삭제
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           )}
           {monthExpenses.length === 0 ? (

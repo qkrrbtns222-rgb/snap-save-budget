@@ -544,6 +544,15 @@ function Index() {
     }
   };
 
+  const resetAllExpenses = async () => {
+    const { error } = await supabase.from("expenses").delete().not("id", "is", null);
+    if (error) toast.error("초기화 실패: " + error.message);
+    else {
+      toast.success("전체 내역을 초기화했어요");
+      loadExpenses();
+    }
+  };
+
   const [editing, setEditing] = useState<Draft | null>(null);
 
   const openEdit = (e: Expense) => {
